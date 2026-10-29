@@ -1,0 +1,10 @@
+target/
+/dist/
+*.nro
+*.nso
+*.elf
+*.zip
+*.log
+*.dmp
+__pycache__/
+PROGRESS.md
