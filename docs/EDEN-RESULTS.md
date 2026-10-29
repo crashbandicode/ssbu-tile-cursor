@@ -16,9 +16,9 @@ API. The full `events.log` of the run is kept with the test evidence.
 
 ## Gaps
 
-- **Empty hand on the character select.** After P1 placed its token
-  ("Ready to fight" showing), L3+D-pad wrote no line at all and did not move
-  the hand. Steps resume once the hand holds a token again.
+- **Empty hand on the character select (intended).** After P1 placed its
+  token ("Ready to fight" showing), L3+D-pad writes nothing and does not move
+  the hand. Press B to take the token back; steps then resume.
 - **CPU token not tested.** A Random CPU's token could not be picked up from
   its panel in this run, so moving a CPU's token was not exercised. The
   plugin moves the hand, and a carried token follows the hand, as P1's did.
