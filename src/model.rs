@@ -11,6 +11,10 @@
 //! screen centre, y up). Setting the target to a neighbouring rectangle's
 //! centre therefore moves the hand exactly one tile, through the game's own
 //! movement, whatever the frame pacing.
+//!
+//! On the CSS a step needs P1's hand to be carrying a token (its own or a
+//! CPU's): the game records the hovered fighter for the carried token's slot,
+//! and an empty hand only points at tokens and buttons.
 
 use core::fmt;
 
@@ -23,20 +27,21 @@ pub struct Site {
     pub guard: [u8; 64],
 }
 
-/// CSS main-state update `fn(css)` (`.text+0x1a12f60`), once per frame while
-/// players pick fighters: its `mov x19, x0` right after the prologue (x0 =
-/// css). Past the entry, so a plugin that replaces the entry (as the lobby
-/// window does) and this hook do not overlap.
-pub const CSS_UPDATE_OFFSET: usize = 0x1a12f8c;
-pub const CSS_UPDATE: Site = Site {
-    name: "css_update",
-    offset: CSS_UPDATE_OFFSET,
+/// CSS players update `fn(css)` (`.text+0x1a2b570`): its `mov x28, x0` after
+/// the prologue (x0 = css). The CSS scene task calls it every frame (vtable
+/// slot `0x50a8b20` -> `0x1a31860`, css = task `+0x80`) in every state of
+/// the CSS state machine, and it runs every hand's own update (`0x32d2ba0`).
+/// The fighter-picking state `0x1a12f60` is only one of those states.
+pub const CSS_PLAYERS_OFFSET: usize = 0x1a2b5a4;
+pub const CSS_PLAYERS: Site = Site {
+    name: "css_players",
+    offset: CSS_PLAYERS_OFFSET,
     guard: [
-        0xf3, 0x03, 0x00, 0xaa, 0x08, 0x01, 0x00, 0x35, 0x68, 0xce, 0x40, 0xf9, 0x08, 0x01, 0x40,
-        0xf9, 0x00, 0x01, 0x40, 0xf9, 0xe1, 0x03, 0x00, 0x32, 0x53, 0x8c, 0x75, 0x94, 0x60, 0xfa,
-        0x46, 0xf9, 0x89, 0xf3, 0x62, 0x94, 0x74, 0x1e, 0x41, 0xf9, 0x6e, 0x22, 0x41, 0xf9, 0x6d,
-        0xd2, 0x05, 0x91, 0x9f, 0x02, 0x0e, 0xeb, 0x60, 0x46, 0x01, 0x54, 0x68, 0x42, 0x09, 0x91,
-        0xe8, 0x03, 0x00, 0xf9,
+        0xfc, 0x03, 0x00, 0xaa, 0x68, 0x00, 0x00, 0x34, 0xe9, 0x03, 0x00, 0x32, 0x04, 0x00, 0x00,
+        0x14, 0x89, 0x27, 0x7e, 0x39, 0x3f, 0x01, 0x00, 0x71, 0xe9, 0x07, 0x9f, 0x1a, 0xe9, 0x37,
+        0x00, 0xb9, 0x09, 0x00, 0x80, 0x12, 0x89, 0x6b, 0x0f, 0xb9, 0x89, 0x1f, 0x41, 0xf9, 0x8a,
+        0x23, 0x41, 0xf9, 0x3f, 0x01, 0x0a, 0xeb, 0x60, 0x01, 0x00, 0x54, 0x28, 0x05, 0x40, 0xf9,
+        0x29, 0x41, 0x00, 0x91,
     ],
 };
 
@@ -114,13 +119,76 @@ pub const SSS_HIT_TEST: Site = Site {
     ],
 };
 
-pub const SITES: [&Site; 6] = [
-    &CSS_UPDATE,
+/// Not hooked: the player constructor storing the player index at `+0x28`
+/// (`str w8, [x21, #0x28]`) and -1 in the token fields `+0x2c`/`+0x30`.
+pub const CSS_PLAYER_INDEX: Site = Site {
+    name: "css_player_index",
+    offset: 0x1a0e528,
+    guard: [
+        0x88, 0x02, 0x40, 0xb9, 0x09, 0x00, 0x80, 0x92, 0xa9, 0xc2, 0x02, 0xf8, 0xe9, 0x03, 0x10,
+        0x32, 0xa9, 0x36, 0x00, 0xb9, 0xe2, 0x03, 0x00, 0x91, 0xa8, 0x2a, 0x00, 0xb9, 0xe8, 0x03,
+        0x00, 0xb9, 0x88, 0x06, 0x40, 0xb9, 0xe8, 0x07, 0x00, 0xb9, 0x88, 0xa2, 0x40, 0x39, 0xe8,
+        0x23, 0x00, 0x39, 0xa0, 0x12, 0x40, 0xf9, 0xe1, 0x03, 0x16, 0xaa, 0xb8, 0x10, 0x63, 0x94,
+        0xa1, 0x2a, 0x40, 0xb9,
+    ],
+};
+
+/// Not hooked: a hand picking a token up sets the hand's holding flag
+/// (`strb w9, [x8, #0x167]`) and the player's carried slot (`str w21, [x8,
+/// #0x30]`) together.
+pub const CSS_GRAB: Site = Site {
+    name: "css_grab",
+    offset: 0x1a14740,
+    guard: [
+        0x88, 0x06, 0x40, 0xf9, 0x08, 0x11, 0x40, 0xf9, 0xe9, 0x03, 0x00, 0x32, 0x09, 0x9d, 0x05,
+        0x39, 0x88, 0x06, 0x40, 0xf9, 0x15, 0x31, 0x00, 0xb9, 0x88, 0x06, 0x40, 0xf9, 0x08, 0x09,
+        0x40, 0xf9, 0x16, 0x05, 0x40, 0xf9, 0xc0, 0x62, 0x06, 0x91, 0xe1, 0x03, 0x1f, 0x2a, 0x82,
+        0x4c, 0x80, 0x52, 0xcc, 0xae, 0x7e, 0x94, 0xc8, 0x32, 0x10, 0x91, 0x1f, 0x01, 0x00, 0xf9,
+        0xc8, 0x92, 0x10, 0x91,
+    ],
+};
+
+/// Not hooked: the fighter-picking update reads the carried slot (`ldr w28,
+/// [x8, #0x30]`), the active flag (`+0x36`), the hand (`+0x20`) and its
+/// cursor (`+0x100`) before hit-testing.
+pub const CSS_CARRIED: Site = Site {
+    name: "css_carried",
+    offset: 0x1a13078,
+    guard: [
+        0x88, 0x06, 0x40, 0xf9, 0x19, 0x09, 0x40, 0xf9, 0x29, 0x07, 0x40, 0xf9, 0x1c, 0x31, 0x40,
+        0xb9, 0x96, 0x7f, 0x40, 0x93, 0x2a, 0x85, 0x44, 0xb9, 0x8a, 0x00, 0x00, 0x35, 0x29, 0x89,
+        0x44, 0xb9, 0x3f, 0x05, 0x00, 0x31, 0x80, 0x29, 0x00, 0x54, 0x09, 0xd9, 0x40, 0x39, 0xc9,
+        0x12, 0x00, 0x34, 0x09, 0x11, 0x40, 0xf9, 0x29, 0x81, 0x40, 0xf9, 0x20, 0x05, 0x43, 0xad,
+        0x01, 0xe4, 0x21, 0x4e,
+    ],
+};
+
+/// Not hooked: with no carried token (-1) the update skips the hover; else it
+/// compares the hit tile with the record `[css+0xdd0] + 0xe0 + slot * 0x18`
+/// of the carried token's slot.
+pub const CSS_HOVER_SLOT: Site = Site {
+    name: "css_hover_slot",
+    offset: 0x1a13148,
+    guard: [
+        0xf8, 0x03, 0x05, 0x2a, 0x9f, 0x07, 0x00, 0x31, 0x40, 0xa3, 0x00, 0x54, 0x9f, 0x23, 0x00,
+        0x71, 0x42, 0xe7, 0x01, 0x54, 0x60, 0xea, 0x46, 0xf9, 0xe9, 0x07, 0x1d, 0x32, 0xc9, 0x02,
+        0x09, 0x9b, 0x29, 0xe1, 0x40, 0xb9, 0x1f, 0x03, 0x09, 0x6b, 0x80, 0x0c, 0x00, 0x54, 0x69,
+        0x2e, 0x41, 0xf9, 0x68, 0x2a, 0x41, 0xf9, 0x29, 0x01, 0x08, 0xcb, 0x29, 0xfd, 0x44, 0x93,
+        0x3f, 0x01, 0x16, 0xeb,
+    ],
+};
+
+pub const SITES: [&Site; 10] = [
+    &CSS_PLAYERS,
     &SSS_UPDATE,
     &CURSOR_QUERY,
     &INPUT_QUERY,
     &CSS_HIT_TEST,
     &SSS_HIT_TEST,
+    &CSS_PLAYER_INDEX,
+    &CSS_GRAB,
+    &CSS_CARRIED,
+    &CSS_HOVER_SLOT,
 ];
 
 /// The hand (0x170-byte object, constructor `.text+0x32d2400`).
@@ -129,6 +197,9 @@ pub mod hand {
     pub const CURSOR: usize = 0x100;
     /// Non-zero while the hand is shown and enabled (`set_hand_enable`).
     pub const ENABLED: usize = 0x163;
+    /// Non-zero while the hand holds a token (set and cleared together with
+    /// the player's carried slot).
+    pub const HOLDING: usize = 0x167;
 }
 
 /// The hand's cursor (0xb0 bytes, vtable `0x523dc80`). Positions are 16-byte
@@ -143,18 +214,36 @@ pub mod cursor {
 pub mod css {
     /// `std::vector` of 16-byte entries; entry `+8` is a player object.
     pub const PLAYERS: usize = 0x238;
-    /// Player object: its hand, its slot (0 = P1) and the "hand active" flag
-    /// the update checks before hit-testing.
+    /// Player object: its hand, its index (0 = P1), the slot of the token
+    /// its hand carries (-1 for none) and the "hand active" flag the update
+    /// checks before hit-testing.
     pub const PLAYER_HAND: usize = 0x20;
-    pub const PLAYER_SLOT: usize = 0x30;
+    pub const PLAYER_INDEX: usize = 0x28;
+    pub const PLAYER_CARRIED: usize = 0x30;
     pub const PLAYER_ACTIVE: usize = 0x36;
+    /// Player and token slots.
+    pub const SLOTS: usize = 8;
     /// Fighter tiles: an object whose `+0`/`+8` are a vector's begin/end.
     pub const TILES: usize = 0xdd0;
     pub const TILE_STRIDE: usize = 0xb0;
     pub const TILE_RECT: usize = 0x48;
-    /// The hovered tile index per player slot: `+0xe0 + slot * 0x18`.
+    /// The hovered tile index per token slot: `+0xe0 + slot * 0x18`.
     pub const HOVERED: usize = 0xe0;
     pub const HOVERED_STRIDE: usize = 0x18;
+
+    /// The slot of the token a hand carries, from the player's carried slot
+    /// and the hand's holding flag; `None` unless both say it holds one.
+    pub fn carried(slot: i32, holding: u8) -> Option<usize> {
+        usize::try_from(slot)
+            .ok()
+            .filter(|&slot| slot < SLOTS && holding != 0)
+    }
+
+    /// Where, from the tiles object, the game records the hovered tile for a
+    /// token slot.
+    pub fn hover_record(slot: usize) -> Option<usize> {
+        (slot < SLOTS).then(|| HOVERED + slot * HOVERED_STRIDE)
+    }
 }
 
 /// The stage select object passed to its update.
@@ -539,18 +628,35 @@ pub fn pack_screen(screen: Screen, tiles: usize, heap_allocations: u64) -> (u64,
     )
 }
 
-pub fn pack_step(screen: Screen, dir: Dir, step: &Step) -> (u64, u64) {
+/// A step, with the slot of the token the hand carries (CSS only).
+pub fn pack_step(screen: Screen, dir: Dir, step: &Step, token: Option<usize>) -> (u64, u64) {
     (
         screen.code()
             | u64::from(dir.code()) << 8
             | pack_index(step.from) << 16
-            | pack_index(step.to) << 32,
+            | pack_index(step.to) << 32
+            | pack_index(token) << 48,
         pack_point(step.target),
     )
 }
 
+/// ` token=p<n>` for a carried token's slot (`p1` = P1's own); nothing when
+/// there is none.
+struct Token(u64);
+
+impl fmt::Display for Token {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if self.0 == NONE16 {
+            Ok(())
+        } else {
+            write!(f, " token=p{}", self.0 + 1)
+        }
+    }
+}
+
 /// The hand stopped after a step: the tile it is on by the game's rectangles
-/// and, on the CSS, the hovered tile the game itself recorded.
+/// and, on the CSS, the hovered tile the game itself recorded for the slot of
+/// the carried token.
 pub fn pack_settled(
     screen: Screen,
     at: Option<usize>,
@@ -579,9 +685,10 @@ pub fn describe(event: &RawEvent, out: &mut impl fmt::Write) -> fmt::Result {
             let dir = Dir::from_code((a >> 8 & 0xff) as u8).map_or("?", Dir::name);
             write!(
                 out,
-                "step screen={screen} dir={dir} from={} to={} x={x:.1} y={y:.1}",
+                "step screen={screen} dir={dir} from={} to={}{} x={x:.1} y={y:.1}",
                 Index(a >> 16 & 0xffff),
-                Index(a >> 32 & 0xffff)
+                Index(a >> 32 & 0xffff),
+                Token(a >> 48 & 0xffff)
             )
         }
         EV_SETTLED => {
@@ -604,15 +711,20 @@ mod tests {
 
     #[test]
     fn guards_start_with_the_hooked_instructions() {
-        // mov x19,x0 / mov x19,x0 / mov x0,x20 /
-        // sub sp,sp,#0x40 / ldr x9,[x19,#0xdd0] / ldp x9,x10,[x0,#0x168]
+        // mov x28,x0 / mov x19,x0 / mov x0,x20 /
+        // sub sp,sp,#0x40 / ldr x9,[x19,#0xdd0] / ldp x9,x10,[x0,#0x168] /
+        // ldr w8,[x20] / ldr x8,[x20,#8] / ldr x8,[x20,#8] / mov w24,w5
         let heads = [
-            [0xf3, 0x03, 0x00, 0xaa],
+            [0xfc, 0x03, 0x00, 0xaa],
             [0xf3, 0x03, 0x00, 0xaa],
             [0xe0, 0x03, 0x14, 0xaa],
             [0xff, 0x03, 0x01, 0xd1],
             [0x69, 0xea, 0x46, 0xf9],
             [0x09, 0xa8, 0x56, 0xa9],
+            [0x88, 0x02, 0x40, 0xb9],
+            [0x88, 0x06, 0x40, 0xf9],
+            [0x88, 0x06, 0x40, 0xf9],
+            [0xf8, 0x03, 0x05, 0x2a],
         ];
         for (site, head) in SITES.iter().zip(heads) {
             assert_eq!(site.guard[..4], head, "{}", site.name);
@@ -628,6 +740,67 @@ mod tests {
         let target = (CURSOR_QUERY_OFFSET as i64 + 4 + i64::from(imm) * 4) as usize;
         assert_eq!(bl >> 26, 0b100101);
         assert_eq!(target, INPUT_QUERY.offset);
+    }
+
+    /// Instruction `index` of a guard.
+    fn word(site: &Site, index: usize) -> u32 {
+        let at = index * 4;
+        u32::from_le_bytes(site.guard[at..at + 4].try_into().unwrap())
+    }
+
+    /// The byte offset of an unsigned-offset LDR/STR (any size).
+    fn load_store_offset(word: u32) -> usize {
+        assert_eq!(
+            word & 0x3b00_0000,
+            0x3900_0000,
+            "not LDR/STR imm: {word:#x}"
+        );
+        (((word >> 10) & 0xfff) << (word >> 30)) as usize
+    }
+
+    #[test]
+    fn witnesses_use_the_offsets_the_plugin_reads() {
+        // The players update walks css+0x238 (ldr x9, [x28, #0x238]).
+        assert_eq!(load_store_offset(word(&CSS_PLAYERS, 10)), css::PLAYERS);
+        // The constructor stores the player index (str w8, [x21, #0x28]).
+        assert_eq!(
+            load_store_offset(word(&CSS_PLAYER_INDEX, 6)),
+            css::PLAYER_INDEX
+        );
+        // Grabbing sets the holding flag and the carried slot together.
+        assert_eq!(load_store_offset(word(&CSS_GRAB, 1)), css::PLAYER_HAND);
+        assert_eq!(load_store_offset(word(&CSS_GRAB, 3)), hand::HOLDING);
+        assert_eq!(load_store_offset(word(&CSS_GRAB, 5)), css::PLAYER_CARRIED);
+        // The fighter-picking update reads the carried slot, the active flag,
+        // the hand and its cursor.
+        assert_eq!(
+            load_store_offset(word(&CSS_CARRIED, 3)),
+            css::PLAYER_CARRIED
+        );
+        assert_eq!(
+            load_store_offset(word(&CSS_CARRIED, 10)),
+            css::PLAYER_ACTIVE
+        );
+        assert_eq!(load_store_offset(word(&CSS_CARRIED, 12)), css::PLAYER_HAND);
+        assert_eq!(load_store_offset(word(&CSS_CARRIED, 13)), hand::CURSOR);
+        // ... and indexes the hover record by that slot.
+        assert_eq!(load_store_offset(word(&CSS_HOVER_SLOT, 5)), css::TILES);
+        assert_eq!(load_store_offset(word(&CSS_HOVER_SLOT, 8)), css::HOVERED);
+    }
+
+    #[test]
+    fn only_a_held_token_counts_as_carried() {
+        assert_eq!(css::carried(0, 1), Some(0), "P1's own token");
+        assert_eq!(css::carried(1, 1), Some(1), "a CPU's token in slot 2");
+        assert_eq!(css::carried(-1, 0), None, "empty hand");
+        assert_eq!(css::carried(-1, 1), None);
+        assert_eq!(css::carried(0, 0), None, "slot left over, not holding");
+        assert_eq!(css::carried(7, 1), Some(7));
+        assert_eq!(css::carried(8, 1), None);
+        assert_eq!(css::hover_record(0), Some(0xe0));
+        assert_eq!(css::hover_record(1), Some(0xf8));
+        assert_eq!(css::hover_record(7), Some(0xe0 + 7 * 0x18));
+        assert_eq!(css::hover_record(8), None);
     }
 
     const PRESS: u64 = BUTTON_L3 | BUTTON_RIGHT;
@@ -834,7 +1007,7 @@ mod tests {
     fn lines_read_back() {
         let tiles = css_grid();
         let step = neighbour(&tiles[..], centre(&tiles, 14), Dir::Right, &SCREEN);
-        let (a, b) = pack_step(Screen::Css, Dir::Right, &step);
+        let (a, b) = pack_step(Screen::Css, Dir::Right, &step, Some(0));
         let mut line = Line::<128>::new();
         describe(
             &RawEvent {
@@ -848,11 +1021,27 @@ mod tests {
         .unwrap();
         assert_eq!(
             core::str::from_utf8(line.as_bytes()).unwrap(),
-            "7 step screen=css dir=right from=14 to=15 x=-528.0 y=240.0"
+            "7 step screen=css dir=right from=14 to=15 token=p1 x=-528.0 y=240.0"
+        );
+        line.clear();
+        let (a, b) = pack_step(Screen::Css, Dir::Up, &step, Some(1));
+        describe(
+            &RawEvent {
+                tick: 11,
+                code: EV_STEP,
+                a,
+                b,
+            },
+            &mut line,
+        )
+        .unwrap();
+        assert_eq!(
+            core::str::from_utf8(line.as_bytes()).unwrap(),
+            "11 step screen=css dir=up from=14 to=15 token=p2 x=-528.0 y=240.0"
         );
         line.clear();
         let edge = neighbour(&tiles[..], (0.0, -400.0), Dir::Down, &SCREEN);
-        let (a, b) = pack_step(Screen::Sss, Dir::Down, &edge);
+        let (a, b) = pack_step(Screen::Sss, Dir::Down, &edge, None);
         describe(
             &RawEvent {
                 tick: 8,

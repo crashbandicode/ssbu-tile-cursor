@@ -7,8 +7,12 @@ one fighter or stage tile.
 Stick input overshoots tiles in automation, because how far the hand travels
 depends on how long the stick is held and on the emulator's frame pacing. With
 this plugin a test presses L3 + a direction and the hand lands on the centre of
-the neighbouring tile. If the hand is carrying a CPU's token, the token moves
-with it.
+the neighbouring tile.
+
+On the character select screen the hand steps while it carries a token: P1's
+own token, or a CPU's token that P1's hand has picked up. The token moves with
+the hand. Once P1 has placed its token and the hand is empty, L3 + D-pad does
+nothing; press B to take the token back.
 
 - The first step fires on the press. While the combination is held, it repeats
   every 250 ms.
@@ -21,8 +25,8 @@ with it.
 - The game's own hand easing performs the move, taking about 8 frames.
 
 Without L3, the D-pad and stick behave as in the unmodified game. While L3 is
-held on these two screens, the plugin drops D-pad movement for P1's hand. Its
-three hooks do nothing anywhere else.
+held and P1's hand can step, the plugin drops D-pad movement for that hand.
+Its three hooks do nothing anywhere else.
 
 ## Install
 
@@ -39,15 +43,16 @@ Everything is written to `sd:/ultimate/ssbu-tile-cursor/events.log`:
 ```text
 <tick> plugin=ssbu-tile-cursor/0.1.0 hooks=css,sss,cursor_query heap_allocations=0
 <tick> screen=css tiles=<n> heap_allocations=0
-<tick> step screen=css dir=right from=14 to=15 x=-528.0 y=240.0
+<tick> step screen=css dir=right from=14 to=15 token=p1 x=-528.0 y=240.0
 <tick> settled screen=css at=15 hovered=15 x=-528.0 y=240.0
 ```
 
 | Field | Meaning |
 |---|---|
 | `from`, `to` | Indices in the game's tile vector. `none` means the hand was off every tile, or there was no tile in that direction. |
+| `token` | CSS only: the slot of the token the hand carries. `p1` is P1's own token and `p2` is slot 2's token, for example a CPU's. |
 | `x`, `y` | The target point, in layout units. |
-| `settled` | Logged once the hand stops. `at` is the tile under the hand. `hovered` is the tile the game recorded for P1 (CSS only). |
+| `settled` | Logged once the hand stops. `at` is the tile under the hand. `hovered` is the tile the game recorded for the carried token's slot (CSS only). |
 
 A tick is 1/19.2 MHz.
 

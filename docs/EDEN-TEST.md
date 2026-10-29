@@ -9,7 +9,7 @@ logged next to the plugin's.
 | Item | Value |
 |---|---|
 | NRO | `dist/libssbu_tile_cursor.nro` (a copy of `target/aarch64-skyline-switch/release/libssbu_tile_cursor.nro`) |
-| sha256 | `24de3f122799d5942500e1d8beeac2e32e8a6109e508faec760bd2232fefba0e` |
+| sha256 | `b8313ca2e66a52f1bcfc4afc764df1b7cdc5aee7e194bdea671cea02746934bc` |
 | Game | 13.0.5 |
 | Install to | `<eden sdmc>/atmosphere/contents/01006A800016E000/romfs/skyline/plugins/libssbu_tile_cursor.nro` |
 | Log | `<eden sdmc>/ultimate/ssbu-tile-cursor/events.log`. It is appended in batches every 100 ms and closed after each batch, so the host file is current. |
@@ -17,7 +17,7 @@ logged next to the plugin's.
 ## Input commands
 
 The commands below use the Eden control API's `input.button`. Use these button
-names: `lstick` (L3), `up`, `down`, `left`, `right`, `a`.
+names: `lstick` (L3), `up`, `down`, `left`, `right`, `a`, `b`.
 
 **Press L3 before the direction.** A D-pad press that arrives before L3 is an
 ordinary D-pad press, and it moves the hand as in the unmodified game.
@@ -62,13 +62,15 @@ positions in the game's tile vector: consecutive within a row on the CSS.
 3. **Unmodified D-pad.** Run `press right 150` with no L3. The hand moves the
    usual small D-pad distance, and no `step` line is written.
 
-4. **First step from the starting position.** The hand starts on the P1 token,
-   below the grid. Run `press lstick,up 150`.
+4. **First step from the starting position.** The hand starts below the grid,
+   holding P1's token. Run `press lstick,up 150`.
    ```text
-   <t> step screen=css dir=up from=none to=<k> x=.. y=..
+   <t> step screen=css dir=up from=none to=<k> token=p1 x=.. y=..
    <t> settled screen=css at=<k> hovered=<k> x=.. y=..
    ```
-   The `x`/`y` in `settled` equal those in `step`.
+   The `x`/`y` in `settled` equal those in `step`. `token=p1` means the hand
+   carries P1's own token. On the CSS, steps only happen while the hand
+   carries a token.
 
 5. **Single steps right.** Run `press lstick,right 150` three times. Expect
    `from=<k> to=<k+1>`, then `from=<k+1> to=<k+2>`, then `from=<k+2> to=<k+3>`,
@@ -87,29 +89,45 @@ positions in the game's tile vector: consecutive within a row on the CSS.
    that retargets an easing hand cancels the earlier `settled`. The last tile
    reached always gets one.
 
-8. **CPU token.**
-   1. Add a CPU in slot 2.
-   2. Move P1's hand onto the CPU's token with steps, or with the existing
-      route, and press `a` to pick the token up.
-   3. Run `press lstick,right 150`. The `step` and `settled` lines are as in
-      step 5, and the token moves with the hand.
-   4. Press `a` to drop the token.
+8. **Empty hand (intended: nothing happens).** Press `a` to place P1's token
+   on the fighter under the hand. The "Ready to fight" banner appears. Then:
+   1. Run `press lstick,left 150`. No `step` line is written. The hand moves
+      the usual small D-pad distance, as in the unmodified game.
+   2. Press `b` to take the token back. Run `press lstick,right 150`. The
+      line is `step ... token=p1`, as in step 5.
+   3. Press `a` again to place the token for the next step.
 
-   The CPU panel now shows the fighter at tile `<to>`. Optionally take one
-   screenshot to confirm this. `hovered` is P1's slot hover, which follows the
-   hand.
+9. **CPU token.** This needs a CPU in slot 2 whose coin is on the Random tile.
+   The Random tile is to the right of Mii Gunner. P1's token must be placed
+   ("Ready to fight" showing), so that P1's hand is empty.
+   1. Move the hand onto the CPU's coin on the Random tile with the existing
+      route, and press `a` to pick the coin up. The hand pointer is the
+      fingertip: the coin is picked up only when the fingertip is on the
+      coin. While the coin is carried, the CPU's panel previews the fighter
+      under the hand.
+   2. Run `press lstick,left 150`, then `press lstick,up 150`. Each step line
+      has `token=p2`, which is slot 2's token. The first one goes from the
+      Random tile (`from=<r>`) to the tile on its left, normally `to=<r-1>`
+      (Mii Gunner). Each is followed by `settled ... at=<to> hovered=<to>`. `hovered` here is
+      the hover the game records for slot 2, the slot of the carried coin. The
+      coin moves with the hand.
+   3. Press `a` to drop the coin. The CPU panel shows the fighter at the last
+      `to`. Optionally take one screenshot to confirm this.
+   4. With the hand empty again, run `press lstick,right 150`. No `step` line
+      is written, as in step 8.
 
-9. **Stage select.** Pick a fighter and continue to stage select.
-   ```text
-   <t> screen=sss tiles=<m> heap_allocations=0
-   ```
-   Repeat steps 4–7 on this screen. The lines read `screen=sss`. `hovered` is
-   always `none` here, because the game keeps the stage hover in Lua; `at` is the
-   game's rectangle under the hand and must equal `to`. Switching the stage form
-   tab or page does not change `tiles`; the vector is the one the game
-   hit-tests. Report any step whose `to` is an off-screen tile.
+10. **Stage select.** Continue to stage select.
+    ```text
+    <t> screen=sss tiles=<m> heap_allocations=0
+    ```
+    Repeat steps 4–7 on this screen. The lines read `screen=sss` and have no
+    `token` field. `hovered` is always `none` here, because the game keeps the
+    stage hover in Lua; `at` is the game's rectangle under the hand and must
+    equal `to`. Switching the stage form tab or page does not change `tiles`;
+    the vector is the one the game hit-tests. Report any step whose `to` is an
+    off-screen tile.
 
-10. **Nothing outside the two screens.** In a match, run `press lstick,right 150`.
+11. **Nothing outside the two screens.** In a match, run `press lstick,right 150`.
     No `step` line is written and the taunt plays as usual.
 
 ## Pass criteria
@@ -120,6 +138,11 @@ positions in the game's tile vector: consecutive within a row on the CSS.
   `hovered=<i>` on the CSS. In a held repeat, at least the final step is.
 - Consecutive single steps in one direction visit consecutive tiles, and none
   are skipped.
-- The unmodified D-pad check (step 3) writes no `step` line.
+- On the CSS, every `step` line has `token=p1` while P1's token is carried and
+  `token=p2` while slot 2's coin is carried.
+- The unmodified D-pad check (step 3) and the empty-hand checks (steps 8.1
+  and 9.4) write no `step` line.
+- After the CPU coin is dropped (step 9.3), the CPU panel shows the fighter at
+  the last `to`.
 
 Report the full `events.log` with the run.

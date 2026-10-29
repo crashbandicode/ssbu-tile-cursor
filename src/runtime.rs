@@ -1,13 +1,15 @@
 //! Switch half: version check, guarded inline hooks, a static event ring and
 //! one writer thread. The two screen hooks run on the game's main thread at
-//! the start of the CSS and stage select updates; they poll P1's controller
-//! through `nn::hid` (read-only), and on an L3 + D-pad step write the hand
-//! cursor's target, which the game's own cursor update then eases to. The
-//! third hook sits in that cursor update just before its stick/D-pad query
-//! and, only for P1's hand and only while L3 is held, points the query at a
-//! copy of the input object with the D-pad cleared. Nothing allocates: state
-//! is static, buffers live on the stack, and the counting allocator below
-//! reports the plugin's heap allocations (expected 0) in the log.
+//! the start of the per-frame CSS players update and the stage select update.
+//! While P1's hand may step (on the CSS: while it carries a token) they poll
+//! P1's controller through `nn::hid` (read-only), and on an L3 + D-pad step
+//! write the hand cursor's target, which the game's own cursor update then
+//! eases to. The third hook sits in that cursor update just before its
+//! stick/D-pad query and, only for P1's hand, only while it may step and only
+//! while L3 is held, points the query at a copy of the input object with the
+//! D-pad cleared. Nothing allocates: state is static, buffers live on the
+//! stack, and the counting allocator below reports the plugin's heap
+//! allocations (expected 0) in the log.
 use crate::model::{
     self, cursor, describe, hand, input, neighbour, pack_screen, pack_settled, pack_step, tile_at,
     Line, RawEvent, Rect, Repeater, Screen, Site, Tiles, BUTTON_L3, EV_SCREEN, EV_SETTLED, EV_STEP,
@@ -31,7 +33,8 @@ const STYLE_FULL_KEY: u32 = 1 << 0;
 const STYLE_HANDHELD: u32 = 1 << 1;
 const STYLE_JOY_DUAL: u32 = 1 << 2;
 const STYLE_GC: u32 = 1 << 5;
-/// The D-pad filter applies only while a screen hook saw P1's hand this recently.
+/// The D-pad filter applies only while a screen hook saw P1's hand able to
+/// step this recently.
 const LIVE_TICKS: u64 = TICKS_PER_SECOND / 5;
 /// Tile vectors longer than this are treated as unreadable.
 const MAX_TILES: u64 = 512;
@@ -90,9 +93,11 @@ static LIVE_UNTIL: AtomicU64 = AtomicU64::new(0);
 struct GameState {
     repeater: Repeater,
     screen: Option<(Screen, u64)>,
-    /// The cursor whose step is waiting to settle, and settled frames seen.
+    /// The cursor whose step is waiting to settle, settled frames seen, and
+    /// the token slot the hand carried for that step (CSS).
     settle_cursor: u64,
     settle_frames: u8,
+    settle_token: Option<usize>,
 }
 struct Shared(UnsafeCell<GameState>);
 // SAFETY: accessed only from the screen hooks, which run on one thread.
@@ -102,6 +107,7 @@ static STATE: Shared = Shared(UnsafeCell::new(GameState {
     screen: None,
     settle_cursor: 0,
     settle_frames: 0,
+    settle_token: None,
 }));
 
 /// The input object copy the D-pad filter hands to the cursor query, and the
@@ -212,13 +218,15 @@ impl Tiles for GameTiles {
     }
 }
 
-/// What a screen hook needs: P1's hand cursor, whether the hand is in play,
-/// the tiles, and (CSS) where the game records P1's hovered tile.
+/// What a screen hook needs: P1's hand cursor, whether the hand may step, the
+/// tiles and, on the CSS, the slot of the token the hand carries and the
+/// tiles object holding the game's hover records.
 struct View {
     cursor: u64,
-    enabled: bool,
+    steppable: bool,
     tiles: GameTiles,
-    hovered: Option<u64>,
+    token: Option<usize>,
+    records: Option<u64>,
 }
 
 unsafe fn hand_cursor(hand: u64) -> Option<(u64, bool)> {
@@ -235,23 +243,30 @@ unsafe fn css_view(css: u64) -> Option<View> {
         read_u64(css + PLAYERS as u64),
         read_u64(css + PLAYERS as u64 + 8),
     );
-    if !valid(begin) || end < begin || end - begin > 8 * 16 {
+    if !valid(begin) || end < begin || end - begin > SLOTS as u64 * 16 {
         return None;
     }
     let player = (begin..end).step_by(16).find_map(|entry| {
         let player = read_u64(entry + 8);
-        (valid(player) && read_i32(player + PLAYER_SLOT as u64) == 0).then_some(player)
+        (valid(player) && read_i32(player + PLAYER_INDEX as u64) == 0).then_some(player)
     })?;
-    let (cursor, enabled) = hand_cursor(read_u64(player + PLAYER_HAND as u64))?;
+    let hand = read_u64(player + PLAYER_HAND as u64);
+    let (cursor, enabled) = hand_cursor(hand)?;
     let list = read_u64(css + TILES as u64);
     if !valid(list) {
         return None;
     }
+    // An empty hand does not step (B takes P1's token back).
+    let token = carried(
+        read_i32(player + PLAYER_CARRIED as u64),
+        read_u8(hand + hand::HOLDING as u64),
+    );
     Some(View {
         cursor,
-        enabled: enabled && read_u8(player + PLAYER_ACTIVE as u64) != 0,
+        steppable: enabled && read_u8(player + PLAYER_ACTIVE as u64) != 0 && token.is_some(),
         tiles: GameTiles::new(read_u64(list), read_u64(list + 8), TILE_STRIDE, TILE_RECT),
-        hovered: Some(list + HOVERED as u64),
+        token,
+        records: Some(list),
     })
 }
 
@@ -260,14 +275,15 @@ unsafe fn sss_view(sss: u64) -> Option<View> {
     let (cursor, enabled) = hand_cursor(read_u64(sss + HAND as u64))?;
     Some(View {
         cursor,
-        enabled,
+        steppable: enabled,
         tiles: GameTiles::new(
             read_u64(sss + TILES as u64),
             read_u64(sss + TILES as u64 + 8),
             TILE_STRIDE,
             TILE_RECT,
         ),
-        hovered: None,
+        token: None,
+        records: None,
     })
 }
 
@@ -311,7 +327,8 @@ unsafe fn on_screen(screen: Screen, object: u64, view: &View) {
             ),
         );
     }
-    let buttons = if view.enabled {
+    // The D-pad filter follows the same gate as the steps.
+    let buttons = if view.steppable {
         LIVE_CURSOR.store(view.cursor, Ordering::Relaxed);
         LIVE_UNTIL.store(now + LIVE_TICKS, Ordering::Relaxed);
         p1_buttons()
@@ -330,9 +347,11 @@ unsafe fn on_screen(screen: Screen, object: u64, view: &View) {
         };
         if state.settle_frames >= 2 {
             state.settle_cursor = 0;
+            // The game records the hover for the carried token's slot.
             let hovered = view
-                .hovered
-                .map(|address| read_i32(address))
+                .records
+                .zip(state.settle_token.and_then(model::css::hover_record))
+                .map(|(records, offset)| read_i32(records + offset as u64))
                 .and_then(|i| usize::try_from(i).ok());
             push_event(
                 EV_SETTLED,
@@ -363,11 +382,12 @@ unsafe fn on_screen(screen: Screen, object: u64, view: &View) {
         }
         state.settle_cursor = view.cursor;
         state.settle_frames = 0;
+        state.settle_token = view.token;
     }
-    push_event(EV_STEP, pack_step(screen, dir, &step));
+    push_event(EV_STEP, pack_step(screen, dir, &step, view.token));
 }
 
-#[skyline::hook(offset = model::CSS_UPDATE_OFFSET, inline)]
+#[skyline::hook(offset = model::CSS_PLAYERS_OFFSET, inline)]
 unsafe fn tile_cursor_css(ctx: &InlineCtx) {
     let css = ctx.registers[0].x();
     if valid(css) {
@@ -388,8 +408,9 @@ unsafe fn tile_cursor_sss(ctx: &InlineCtx) {
 }
 
 /// In the cursor update, before `mov x0, x20; bl` (the stick/D-pad query):
-/// for P1's hand while L3 is held, x20 becomes a context whose input object
-/// is a copy of the real one with the four D-pad words cleared.
+/// for P1's hand while it may step and L3 is held, x20 becomes a context
+/// whose input object is a copy of the real one with the four D-pad words
+/// cleared.
 #[skyline::hook(offset = model::CURSOR_QUERY_OFFSET, inline)]
 unsafe fn tile_cursor_query(ctx: &mut InlineCtx) {
     let cursor = ctx.registers[19].x();
