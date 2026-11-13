@@ -8,16 +8,24 @@ Skyline plugin for Super Smash Bros. Ultimate 13.0.5: on the character and
 stage select screens, **L3 + D-pad** moves P1's hand exactly one tile. Built
 for automation, where stick input overshoots.
 
-![Stage select](docs/media/stage-select.gif)
+![Stage select: four L3 + Right steps move the hand from the Training tile to Final Destination, then L3 + Down moves it one row to Jungle Japes](docs/media/stage-select.gif)
 
-*Six L3 + Right steps from Random land on Final Destination; L3 + Down then moves one row.*
+*Training's stage select: four L3 + Right steps from the Training tile land on
+Final Destination; L3 + Down then moves one row, to Jungle Japes.*
 
-![Character select](docs/media/character-select.gif)
+![Character select: P1's hand carries its token from Mii Swordfighter up to Hero and right to Terry, and A places it](docs/media/character-select-p1.gif)
 
-*P1 steps to its fighter and places its token, picks up the CPU's coin, and
-steps it to Joker.*
+*P1 carries its token from Mii Swordfighter: L3 + Up to Hero, L3 + Right twice
+to Terry, then A places it.*
 
-Both clips: Eden, 2026-10-29, build `15d3f31`.
+![Character select: P1's empty hand picks up the CPU's coin on Random, steps it left three tiles and up one to Joker, and drops it](docs/media/character-select-cpu.gif)
+
+*With P1's token placed, its empty hand picks up the CPU's coin on Random (A),
+carries it to Joker (L3 + Left three times, L3 + Up) and drops it (A).*
+
+All three clips: Eden, 2026-11-13, the v0.1.0 release NRO (`b8313ca2…`, build
+`15d3f31`). The game shows no input on these screens, so the input labels are
+drawn on the clips from the run's own input log.
 
 ## Behaviour
 

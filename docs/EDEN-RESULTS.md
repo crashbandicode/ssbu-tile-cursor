@@ -3,6 +3,20 @@
 Smash 13.0.5 in Eden, this plugin as the only Skyline plugin, driven through
 the Eden control API.
 
+## 2026-11-13, the README clips (the same NRO)
+
+The v0.1.0 release NRO (`b8313ca2…`) in Training's stage and character selects,
+with ARCropolis, `libnro_hook` and `libparam_hook` also loaded. Eden
+`2f315fc4…`, run `pg-tile-1` on the Surface.
+
+| Check | Result |
+|---|---|
+| Install | `hooks=css,sss,cursor_query heap_allocations=0` |
+| Stage select | `tiles=116`; four L3 + Right steps went 0→1→2→3→4 (Training to Final Destination), L3 + Down 4→15; each with a `settled` line at its target |
+| Character select, P1's token | `tiles=87`; L3 + Up from P1's panel went to 78 (Steve); from Mii Swordfighter, L3 + Up 84→73, then 73→74→75 (Terry), `token=p1`, hovered equal to each target; A placed it |
+| CPU's coin | P1's empty hand picked up the coin on Random; L3 + Left ×3 and Up went 86→85→84→83→72 with `token=p2`, and dropping it set the CPU to Joker |
+| A Mii tile | A on Mii Gunner opened the game's Mii list; B closed it, and the hand carried P1's token again (the next step logged `token=p1`) |
+
 ## 2026-10-29, build `15d3f31` (NRO sha256 `b8313ca2…934bc`)
 
 | Check | Result |
