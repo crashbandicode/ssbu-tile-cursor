@@ -6,6 +6,13 @@ logged next to the plugin's.
 
 ## Build under test
 
+The 2026-10-29 run used this build: 0.1.0 from `15d3f31`, the same NRO as
+the v0.1.0 release. Since `a052fd5` (2026-10-30) `main` builds as a cdylib
+only and gives a different NRO, which has not been run in Eden: on
+2026-11-13 every Eden run configuration on the Surface, Yoga and XPS that
+includes the tile cursor (`/home/intpa/eden-runs/*/config.json`) pinned
+`b8313ca2…`.
+
 | Item | Value |
 |---|---|
 | NRO | `dist/libssbu_tile_cursor.nro` (a copy of `target/aarch64-skyline-switch/release/libssbu_tile_cursor.nro`) |
@@ -22,10 +29,11 @@ names: `lstick` (L3), `up`, `down`, `left`, `right`, `a`, `b`.
 **Press L3 before the direction.** A D-pad press that arrives before L3 is an
 ordinary D-pad press, and it moves the hand as in the unmodified game.
 
-The existing driver does this when L3 is listed first:
+The playbook's `gv.py` (`tools/eden-solo/`) does this when L3 is listed
+first:
 
 ```text
-drive.py <a|b> press lstick,right 150    # presses lstick, then right, holds 150 ms, releases both
+gv.py press <eNN> lstick,right 150    # presses lstick, then right, holds 150 ms, releases both
 ```
 
 With `edenctl.py` directly:

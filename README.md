@@ -10,7 +10,7 @@ for automation, where stick input overshoots.
 
 ![Stage select](docs/media/stage-select.gif)
 
-*Six L3 + Right steps from Random land on Final Destination; Down and Up move one row.*
+*Six L3 + Right steps from Random land on Final Destination; L3 + Down then moves one row.*
 
 ![Character select](docs/media/character-select.gif)
 
@@ -29,15 +29,22 @@ Both clips: Eden, 2026-10-29, build `15d3f31`.
 
 ## Install
 
-Copy `libssbu_tile_cursor.nro` to
+Copy `libssbu_tile_cursor.nro` from the
+[v0.1.0 release](https://git.syntaxbyexample.com/intpa/ssbu-tile-cursor/releases/tag/v0.1.0)
+(the build tested in Eden) to
 `sd:/atmosphere/contents/01006A800016E000/romfs/skyline/plugins/`. It checks
 the game version and every hook site at boot and installs nothing if either
-differs. Each step is logged to `sd:/ultimate/ssbu-tile-cursor/events.log`:
+differs. Each step is logged to `sd:/ultimate/ssbu-tile-cursor/events.log`,
+after the tick:
 
 ```text
-step screen=css dir=left from=85 to=84 token=p2 x=288.0 y=-77.0
-settled screen=css at=84 hovered=84 x=288.0 y=-77.0
+<tick> step screen=css dir=left from=85 to=84 token=p2 x=288.0 y=-77.0
+<tick> settled screen=css at=84 hovered=84 x=288.0 y=-77.0
 ```
+
+It is a tool for testing in Eden. It has not been tested on a Switch, and
+the Switch card's install records from 2026-10-30 to 2026-11-12 do not list
+it.
 
 ## Build
 
@@ -45,6 +52,10 @@ settled screen=css at=84 hovered=84 x=288.0 y=-77.0
 cargo test
 cargo skyline build --release
 ```
+
+Since `a052fd5` (2026-10-30) `main` builds as a cdylib only, so the release
+profile's LTO applies. That NRO differs from the release one and has not been
+run in Eden.
 
 Hook sites: [docs/HOOKS.md](docs/HOOKS.md). Eden test procedure and results:
 [docs/EDEN-TEST.md](docs/EDEN-TEST.md), [docs/EDEN-RESULTS.md](docs/EDEN-RESULTS.md).
