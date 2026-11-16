@@ -1,0 +1,162 @@
+{
+  "game_id": "01006A800016E000",
+  "about": "Frame-repeat root fix: one Surface boot, CSS/SSS 2-frame shared tile walks plus a 32-frame held repeat on each; no timing/performance claims.",
+  "start": "frontend-ready",
+  "on_failure": "stop",
+  "early_stop": false,
+  "setup": [
+    {
+      "state": "muted, memory_layout_mode 0, GDB stub on port 6794 before game.load",
+      "via": "hook",
+      "ref": "routes:configure_boot"
+    },
+    {
+      "state": "booted with the no-hold kick, TrainingRooms installed",
+      "via": "hook",
+      "ref": "routes:load_game, routes:wait_lines"
+    },
+    {
+      "state": "main menu from title/attract/How-to-Play",
+      "via": "hook",
+      "ref": "routes:to_main (library attract-cancel)"
+    },
+    {
+      "state": "Training stage select -> Battlefield, then Final Destination",
+      "via": "hook",
+      "ref": "routes:main_to_stage, routes:pick_stage (tables.json from TrainingRooms lobby_stages)"
+    },
+    {
+      "state": "P1 Mario",
+      "via": "hook",
+      "ref": "routes:pick_fighters (tables.json from TrainingRooms roster_grid)"
+    },
+    {
+      "state": "held-repeat from tile 0 to tile 3 on each select",
+      "via": "hook",
+      "ref": "steps.py:held_repeat and held-right-32.edenmacro.json"
+    }
+  ],
+  "gates": {
+    "frontend-ready": {
+      "library": "frontend-ready"
+    }
+  },
+  "segments": {
+    "held-right-32": {
+      "file": "held-right-32.edenmacro.json",
+      "sha256": "9c6a9344419d68aec336a6ccc9eeff5af4cd5efb142ce5df07ccdcbc60f3767e",
+      "cap": 30
+    }
+  },
+  "rows": [
+    {
+      "id": "r01-configure",
+      "start": "frontend-ready",
+      "end": "frontend-ready",
+      "budget_min": 1,
+      "steps": [
+        {
+          "gate": "frontend-ready"
+        },
+        {
+          "run": "routes:configure_boot",
+          "args": {
+            "gdb_port": 6794
+          },
+          "check": true
+        }
+      ]
+    },
+    {
+      "id": "r02-load",
+      "start": "frontend-ready",
+      "end": "boot",
+      "budget_min": 6,
+      "steps": [
+        {
+          "run": "routes:load_game",
+          "args": {
+            "gdb_port": 6794
+          },
+          "check": true
+        },
+        {
+          "run": "routes:wait_lines",
+          "args": {
+            "lines": [
+              [
+                "sdmc:ultimate/TrainingRooms/events.log",
+                "plugin=training_rooms/\\S+ game=13\\.0\\.5 .*result=installed heap_allocations=0"
+              ]
+            ],
+            "cap": 120
+          },
+          "check": true
+        },
+        {
+          "shot": "boot"
+        }
+      ]
+    },
+    {
+      "id": "r03-main",
+      "start": "boot",
+      "end": "main",
+      "budget_min": 2,
+      "steps": [
+        {
+          "run": "routes:to_main",
+          "check": true
+        }
+      ]
+    },
+    {
+      "id": "r04-stage-battlefield",
+      "start": "main",
+      "end": "css",
+      "budget_min": 2,
+      "steps": [
+        {
+          "run": "routes:main_to_stage",
+          "check": true
+        },
+        {
+          "run": "steps.py:held_repeat",
+          "args": {
+            "screen": "sss"
+          },
+          "check": true
+        },
+        {
+          "run": "routes:pick_stage",
+          "args": {
+            "stage": "Battlefield"
+          },
+          "check": true
+        }
+      ]
+    },
+    {
+      "id": "r05-fighters",
+      "start": "css",
+      "end": "css-ready",
+      "budget_min": 3,
+      "steps": [
+        {
+          "run": "steps.py:held_repeat",
+          "args": {
+            "screen": "css"
+          },
+          "check": true
+        },
+        {
+          "run": "routes:pick_fighters",
+          "args": {
+            "p1": "Mario"
+          },
+          "check": true
+        }
+      ]
+    }
+  ]
+}

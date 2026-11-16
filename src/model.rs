@@ -271,9 +271,9 @@ pub const BUTTON_RIGHT: u64 = 1 << 14;
 pub const BUTTON_DOWN: u64 = 1 << 15;
 
 pub const TICKS_PER_SECOND: u64 = 19_200_000;
-/// The first step fires on the press; held, it repeats after this long and
-/// then at this interval.
-pub const REPEAT_TICKS: u64 = TICKS_PER_SECOND / 4;
+/// The first step fires on the press; held, it repeats every 15 subsequent
+/// screen updates (250 ms at 60 fps), independent of host wall time.
+pub const REPEAT_FRAMES: u8 = 15;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Dir {
@@ -335,23 +335,24 @@ impl Dir {
 }
 
 /// Turns the polled buttons into steps: one on the first frame L3 and a
-/// single D-pad direction are both held, then one every `REPEAT_TICKS` while
+/// single D-pad direction are both held, then one every `REPEAT_FRAMES` updates while
 /// they stay held. Releasing L3, changing or releasing the direction resets.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct Repeater {
     held: Option<Dir>,
-    next: u64,
+    remaining: u8,
 }
 
 impl Repeater {
     pub const fn new() -> Self {
         Self {
             held: None,
-            next: 0,
+            remaining: 0,
         }
     }
 
-    pub fn update(&mut self, buttons: u64, now: u64) -> Option<Dir> {
+    /// Called exactly once per CSS/SSS frame by the screen hook.
+    pub fn update(&mut self, buttons: u64) -> Option<Dir> {
         let dir = if buttons & BUTTON_L3 != 0 {
             Dir::from_buttons(buttons)
         } else {
@@ -359,12 +360,15 @@ impl Repeater {
         };
         if dir != self.held {
             self.held = dir;
-            self.next = now.wrapping_add(REPEAT_TICKS);
+            self.remaining = REPEAT_FRAMES;
             return dir;
         }
-        if dir.is_some() && now >= self.next {
-            self.next = now.wrapping_add(REPEAT_TICKS);
-            return dir;
+        if dir.is_some() {
+            self.remaining -= 1;
+            if self.remaining == 0 {
+                self.remaining = REPEAT_FRAMES;
+                return dir;
+            }
         }
         None
     }
@@ -808,21 +812,60 @@ mod tests {
     #[test]
     fn steps_fire_on_press_then_repeat() {
         let mut r = Repeater::new();
-        let t = 1_000;
-        assert_eq!(r.update(BUTTON_RIGHT, t), None, "no L3, no step");
-        assert_eq!(r.update(BUTTON_L3, t), None);
-        assert_eq!(r.update(PRESS, t + 1), Some(Dir::Right));
-        assert_eq!(r.update(PRESS, t + 2), None);
-        assert_eq!(r.update(PRESS, t + REPEAT_TICKS), None);
-        assert_eq!(r.update(PRESS, t + 1 + REPEAT_TICKS), Some(Dir::Right));
-        assert_eq!(r.update(PRESS, t + REPEAT_TICKS + 2), None);
-        assert_eq!(r.update(PRESS, t + 1 + 2 * REPEAT_TICKS), Some(Dir::Right));
-        // A new direction steps at once; a diagonal does nothing.
-        assert_eq!(r.update(BUTTON_L3 | BUTTON_UP, t + 5), Some(Dir::Up));
-        assert_eq!(r.update(BUTTON_L3 | BUTTON_UP | BUTTON_LEFT, t + 6), None);
-        // Releasing L3 resets; pressing it again with the D-pad held steps.
-        assert_eq!(r.update(BUTTON_DOWN, t + 7), None);
-        assert_eq!(r.update(BUTTON_L3 | BUTTON_DOWN, t + 8), Some(Dir::Down));
+        assert_eq!(r.update(BUTTON_RIGHT), None, "no L3, no step");
+        assert_eq!(r.update(BUTTON_L3), None);
+        assert_eq!(r.update(PRESS), Some(Dir::Right));
+        for frame in 1..=45 {
+            assert_eq!(
+                r.update(PRESS),
+                (frame % usize::from(REPEAT_FRAMES) == 0).then_some(Dir::Right),
+                "held frame {frame} after the press"
+            );
+        }
+    }
+
+    #[test]
+    fn two_frame_taps_never_repeat() {
+        let mut r = Repeater::new();
+        // No clock argument exists: a frame may take 16 ms, 266 ms or seconds.
+        // Exercise repeated two-frame taps in every direction, with release.
+        for dir in Dir::ALL {
+            let button = match dir {
+                Dir::Up => BUTTON_UP,
+                Dir::Down => BUTTON_DOWN,
+                Dir::Left => BUTTON_LEFT,
+                Dir::Right => BUTTON_RIGHT,
+            };
+            for _ in 0..100 {
+                assert_eq!(r.update(BUTTON_L3 | button), Some(dir));
+                assert_eq!(r.update(BUTTON_L3 | button), None);
+                assert_eq!(r.update(0), None);
+            }
+        }
+    }
+
+    #[test]
+    fn repeat_reset_discards_partial_hold() {
+        for reset in [0, BUTTON_RIGHT, BUTTON_L3, PRESS | BUTTON_UP] {
+            let mut r = Repeater::new();
+            assert_eq!(r.update(PRESS), Some(Dir::Right));
+            for _ in 1..REPEAT_FRAMES {
+                assert_eq!(r.update(PRESS), None);
+            }
+            assert_eq!(r.update(reset), None);
+            assert_eq!(r.update(PRESS), Some(Dir::Right));
+            for _ in 1..REPEAT_FRAMES {
+                assert_eq!(r.update(PRESS), None);
+            }
+            assert_eq!(r.update(PRESS), Some(Dir::Right));
+        }
+        let mut r = Repeater::new();
+        assert_eq!(r.update(PRESS), Some(Dir::Right));
+        assert_eq!(r.update(BUTTON_L3 | BUTTON_UP), Some(Dir::Up));
+        for _ in 1..REPEAT_FRAMES {
+            assert_eq!(r.update(BUTTON_L3 | BUTTON_UP), None);
+        }
+        assert_eq!(r.update(BUTTON_L3 | BUTTON_UP), Some(Dir::Up));
         assert_eq!(Dir::from_buttons(BUTTON_UP | BUTTON_DOWN), None);
     }
 

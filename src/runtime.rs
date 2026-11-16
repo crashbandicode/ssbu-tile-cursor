@@ -359,7 +359,7 @@ unsafe fn on_screen(screen: Screen, object: u64, view: &View) {
             );
         }
     }
-    let Some(dir) = state.repeater.update(buttons, now) else {
+    let Some(dir) = state.repeater.update(buttons) else {
         return;
     };
     let bounds_at = view.cursor + cursor::BOUNDS as u64;

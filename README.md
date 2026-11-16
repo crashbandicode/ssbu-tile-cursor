@@ -15,7 +15,7 @@ the hand. Once P1 has placed its token and the hand is empty, L3 + D-pad does
 nothing; press B to take the token back.
 
 - The first step fires on the press. While the combination is held, it repeats
-  every 250 ms.
+  every 15 game frames (250 ms at 60 fps), independent of host speed.
 - Left and right stay in the row. Up and down go to the nearest tile in the next
   row. At an edge the hand does not move, and nothing wraps.
 - If the hand is not on a tile, the first press moves it to the nearest tile in
