@@ -37,6 +37,8 @@ drawn on the clips from the run's own input log.
 
 ## Install
 
+Tested on: Super Smash Bros. Ultimate 13.0.5 · Switch firmware 23.5.0 · Atmosphère 1.12.2
+
 Copy `libssbu_tile_cursor.nro` from the
 [v0.1.0 release](https://git.syntaxbyexample.com/intpa/ssbu-tile-cursor/releases/tag/v0.1.0)
 (the build tested in Eden) to
