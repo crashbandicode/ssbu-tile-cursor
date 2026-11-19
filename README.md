@@ -68,9 +68,15 @@ continue to handle cursor movement when initial registration is absent.
 The provider distinguishes movement attempts (`ack`), successful target
 writes (`applied`), and the handled step that reached its native hover
 (`settled.ack`). `p1.carried` is the native slot-zero hand's carried token.
-The local controller, exact target identity, committed token, layout
-and local-seat fields require qualification against the release fixture.
-They currently report `unknown`. A stale owner expires after 300 ms.
+On CSS, `kind`, `name` and `form` require a settled carried P1 token and
+agreement between its native hover, the default tile identity and the
+slot-zero panel. The qualified default Steve preview is app fighter 88.
+`p1.token` and `p1.placed.*` describe the native seat-zero medal. The
+placed identity also requires its native index, tile rectangle and
+committed panel flags to agree. The qualified Training and guest slot assignments report controller 0 and native
+seat 0 or 1 from the direct input objects. Guest movement and local token state
+remain unqualified, and the guest cannot inherit native P1 geometry. The layout
+identifier remains unknown. A stale owner expires after 300 ms.
 
 ## Build
 

@@ -684,7 +684,19 @@ pub fn main() {
     }
     observed::initialize();
     let writer = start_writer();
-    let observe = writer && observed::wait_for_registration() && observed::stock_build();
+    let observe = if writer && observed::wait_for_registration() {
+        if !observed::stock_build() {
+            let _ = write!(report, " observed_guard=build_id");
+            false
+        } else if let Some(site) = observed::p1_mismatch() {
+            let _ = write!(report, " observed_guard={site}");
+            false
+        } else {
+            true
+        }
+    } else {
+        false
+    };
     install_cursor_hooks(observe);
     let _ = write!(report, " hooks=css,sss,cursor_query");
     if observe {

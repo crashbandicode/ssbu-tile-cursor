@@ -130,12 +130,125 @@ impl Step {
         }
     }
 
-    fn new_owner(&mut self) {
+    pub(crate) fn new_owner(&mut self) {
         *self = Self {
             ack: self.ack,
             applied: self.applied,
             ..Self::default()
         };
+    }
+}
+
+/// Per-player, directly linked native input. The shared aggregate input is never a candidate.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct SeatInput {
+    pub slot: i32,
+    pub config: i32,
+    pub active: u8,
+    pub input: u64,
+    pub pad: [i32; 3],
+}
+
+pub fn local_seat(rows: &[SeatInput]) -> Option<u8> {
+    if !matches!(rows.len(), 2 | 8) {
+        return None;
+    }
+    let mut local = None;
+    let mut seen = 0u16;
+    for (i, row) in rows.iter().enumerate() {
+        let slot = u8::try_from(row.slot).ok()?;
+        if usize::from(slot) >= rows.len()
+            || row.config != row.slot + 1
+            || row.active != 1
+            || row.input < 0x10000
+            || !row.input.is_multiple_of(8)
+            || seen & (1 << slot) != 0
+            || rows[..i].iter().any(|s| s.input == row.input)
+        {
+            return None;
+        }
+        seen |= 1 << slot;
+        match row.pad {
+            [0, -1, -1] => (),
+            [0, 0, 0] if local.is_none() => local = Some(slot),
+            _ => return None,
+        }
+    }
+    // Exact Training and local-wireless guest assignments from the paired stock controls.
+    match (rows.len(), local) {
+        (2, Some(0)) | (8, Some(1)) => local,
+        _ => None,
+    }
+}
+
+/// The exact typed stock UI identity observed at the Steve preview. The low
+/// 40 bits are Hash40("ui_chara_pickel"); the tag and default variant are
+/// checked before exposing the app fighter kind from the release table.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum Fighter {
+    Steve,
+}
+
+impl Fighter {
+    pub fn id(self) -> u16 {
+        match self {
+            Self::Steve => 88,
+        }
+    }
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::Steve => "\"Steve\"",
+        }
+    }
+}
+
+pub fn fighter_identity(panel: u64, tile: u64, variant: [u8; 2], settled: bool) -> Option<Fighter> {
+    (settled && variant == [0, 0] && panel == tile && tile == 0xc100_700f_dc91_574e)
+        .then_some(Fighter::Steve)
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum P1Token {
+    #[default]
+    Unknown,
+    Held,
+    Placed,
+}
+impl P1Token {
+    fn name(self) -> &'static str {
+        match self {
+            Self::Unknown => "unknown",
+            Self::Held => "held",
+            Self::Placed => "placed",
+        }
+    }
+}
+
+pub struct MedalFacts {
+    pub carried: i32,
+    pub holding: u8,
+    pub visible: u8,
+    pub grabbed: u8,
+    pub panel_flags: [u8; 2],
+    pub placed: Option<u16>,
+    pub rect_matches: bool,
+    pub placed_fighter: Option<Fighter>,
+}
+
+impl MedalFacts {
+    pub fn token(&self) -> P1Token {
+        match (self.carried, self.holding, self.visible, self.grabbed) {
+            (0, 1, 1, 1) => P1Token::Held,
+            (-1, 0, 1, 0)
+                if self.panel_flags == [1, 1]
+                    && self.placed.is_some()
+                    && self.rect_matches
+                    && self.placed_fighter.is_some() =>
+            {
+                P1Token::Placed
+            }
+            _ => P1Token::Unknown,
+        }
     }
 }
 
@@ -148,6 +261,10 @@ pub struct Sample {
     pub at: Option<u16>,
     pub hover: Option<u16>,
     pub p1_carried: Option<u16>,
+    pub local_seat: Option<u8>,
+    pub fighter: Option<Fighter>,
+    pub p1_token: P1Token,
+    pub p1_placed: Option<(u16, Fighter)>,
     pub resting: bool,
     pub step: Step,
 }
@@ -171,6 +288,10 @@ impl Owner {
                 at: None,
                 hover: None,
                 p1_carried: None,
+                local_seat: None,
+                fighter: None,
+                p1_token: P1Token::Unknown,
+                p1_placed: None,
                 resting: false,
                 step: Step {
                     ack: 0,
@@ -292,7 +413,8 @@ impl Publisher {
         let rev = self.revision + 1;
         let mut buf = Line::<1024>::new();
         let step = s.step;
-        let result = if !active || step.dir.is_none() {
+        let p1_view = active && s.local_seat != Some(1);
+        let result = if !p1_view || step.dir.is_none() {
             "unknown"
         } else if step.to.is_some() {
             "handled"
@@ -300,17 +422,72 @@ impl Publisher {
             "edge"
         };
         let valid = |v| if active { v } else { None };
-        let endpoint = |index: Option<u16>| match (active, step.dir, index) {
+        let endpoint = |index: Option<u16>| match (p1_view, step.dir, index) {
             (true, Some(_), Some(i)) => Endpoint::Index(i),
             (true, Some(_), None) => Endpoint::None,
             _ => Endpoint::Unknown,
         };
-        let settled = active && s.resting && s.at.is_some() && s.at == s.hover;
+        let settled = p1_view && s.resting && s.at.is_some() && s.at == s.hover;
         let step_still_matches = settled && s.at == step.to && step.token == s.p1_carried;
         let _ = write!(buf, "schema=tile.cursor/1\nrev={rev}\nboot=0\nack={}\nack.result={result}\nfocus=unknown\nobservation={}\nobservation.active={}", step.ack, s.observation, u8::from(active));
-        let _ = write!(buf, "\nscreen={}\ngeneration={}\nlayout=unknown\nat={}\nhovered={}\nkind=unknown\nname=unknown\nform=unknown", Field(active.then_some(s.screen).flatten().map(Screen::name)), Field(active.then_some(s.generation)), Field(valid(s.at)), Field(valid(s.hover)));
-        let _ = write!(buf, "\ncontroller=unknown\nseat=unknown\ncarried=unknown\np1.carried={}\np1.token=unknown\nlocal.token=unknown\nplaced.at=unknown\nplaced.kind=unknown\nplaced.name=unknown\nplaced.form=unknown\nsettled={}\napplied={}\ndirection={}\nfrom={}\nto={}\nresult={result}\nsettled.ack={}", Field(valid(s.p1_carried)), u8::from(settled), step.applied, Field(active.then_some(step.dir).flatten().map(Dir::name)), endpoint(step.from), endpoint(step.to), Field(step_still_matches.then_some(step.settled_ack).flatten()));
-        if send(buf.as_bytes()) {
+        let fighter = p1_view.then_some(s.fighter).flatten();
+        let token = if active { s.p1_token } else { P1Token::Unknown };
+        let placed = active.then_some(s.p1_placed).flatten();
+        let local_p1 = active && s.local_seat == Some(0);
+        let local_token = if local_p1 { token } else { P1Token::Unknown };
+        let local_placed = local_p1.then_some(placed).flatten();
+        let local_carried = match local_token {
+            P1Token::Held if s.p1_carried == Some(0) => Endpoint::Index(0),
+            P1Token::Placed => Endpoint::None,
+            _ => Endpoint::Unknown,
+        };
+        let _ = write!(
+            buf,
+            "\nscreen={}\ngeneration={}\nlayout=unknown\nat={}\nhovered={}",
+            Field(active.then_some(s.screen).flatten().map(Screen::name)),
+            Field(active.then_some(s.generation)),
+            Field(p1_view.then_some(s.at).flatten()),
+            Field(p1_view.then_some(s.hover).flatten())
+        );
+        let _ = write!(
+            buf,
+            "\nkind={}\nname={}\nform={}",
+            Field(fighter.map(Fighter::id)),
+            Field(fighter.map(Fighter::name)),
+            Field(fighter.map(|_| "default"))
+        );
+        let _ = write!(
+            buf,
+            "\ncontroller={}\nseat={}\ncarried={}\np1.carried={}\np1.token={}",
+            Field(active.then_some(s.local_seat).flatten().map(|_| 0)),
+            Field(active.then_some(s.local_seat).flatten()),
+            local_carried,
+            Field(valid(s.p1_carried)),
+            token.name()
+        );
+        let _ = write!(
+            buf,
+            "\np1.placed.at={}\np1.placed.kind={}\np1.placed.name={}\np1.placed.form={}",
+            Field(placed.map(|x| x.0)),
+            Field(placed.map(|x| x.1.id())),
+            Field(placed.map(|x| x.1.name())),
+            Field(placed.map(|_| "default"))
+        );
+        let _ = write!(
+            buf,
+            "\nlocal.token={}\nplaced.at={}\nplaced.kind={}\nplaced.name={}\nplaced.form={}",
+            local_token.name(),
+            Field(local_placed.map(|x| x.0)),
+            Field(local_placed.map(|x| x.1.id())),
+            Field(local_placed.map(|x| x.1.name())),
+            Field(local_placed.map(|_| "default"))
+        );
+        let _ = write!(
+            buf, "\nsettled={}\napplied={}\ndirection={}\nfrom={}\nto={}\nresult={result}\nsettled.ack={}",
+            u8::from(settled), step.applied, Field(p1_view.then_some(step.dir).flatten().map(Dir::name)),
+            endpoint(step.from), endpoint(step.to), Field(step_still_matches.then_some(step.settled_ack).flatten())
+        );
+        if buf.as_bytes().len() < 1024 && send(buf.as_bytes()) {
             self.revision = rev;
             self.sent = Some(identity);
         }

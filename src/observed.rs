@@ -1,8 +1,9 @@
 //! Discovery and observed owner callbacks. `main` is the only hook installer.
+#[path = "p1.rs"]
+mod p1;
 use super::*;
 use crate::provider::{Api, Discovery, Header, Mailbox, Owner, Publisher, Registered};
 use core::mem::MaybeUninit;
-use core::sync::atomic::AtomicBool;
 
 struct MainOwner(UnsafeCell<Owner>);
 // SAFETY: only the two accepted, main-thread CSS/SSS callbacks use this value.
@@ -16,7 +17,7 @@ struct StartupEvent(UnsafeCell<MaybeUninit<nn::os::EventType>>);
 unsafe impl Sync for StartupEvent {}
 static FIRST_POLL: StartupEvent = StartupEvent(UnsafeCell::new(MaybeUninit::uninit()));
 static INSTALL_FINISHED: StartupEvent = StartupEvent(UnsafeCell::new(MaybeUninit::uninit()));
-static REGISTERED_AT_START: AtomicBool = AtomicBool::new(false);
+static REGISTERED_AT_START: StartupEvent = StartupEvent(UnsafeCell::new(MaybeUninit::uninit()));
 
 fn event() -> *mut nn::os::EventType {
     FIRST_POLL.0.get().cast()
@@ -24,7 +25,11 @@ fn event() -> *mut nn::os::EventType {
 
 pub(super) fn initialize() {
     unsafe {
-        for e in [event(), INSTALL_FINISHED.0.get().cast()] {
+        for e in [
+            event(),
+            INSTALL_FINISHED.0.get().cast(),
+            REGISTERED_AT_START.0.get().cast(),
+        ] {
             nn::os::InitializeEvent(e, false, nn::os::EventClearMode_EventClearMode_ManualClear);
         }
     }
@@ -45,7 +50,7 @@ pub(super) fn wait_for_registration() -> bool {
             },
         )
     };
-    completed && REGISTERED_AT_START.load(Ordering::Acquire)
+    completed && unsafe { nn::os::TryWaitEvent(REGISTERED_AT_START.0.get().cast()) }
 }
 
 /// The owned ELF PT_LOAD maps file offset 0x4f17f3c to virtual 0x4f16f3c.
@@ -61,6 +66,14 @@ pub(super) fn stock_build() -> bool {
             && addr + NOTE.len() <= getRegionAddress(Region::Data) as usize
             && core::slice::from_raw_parts(addr as *const u8, NOTE.len()) == NOTE
     }
+}
+
+/// Validate optional reader witnesses only after successful bridge registration.
+pub(super) fn p1_mismatch() -> Option<&'static str> {
+    p1::GUARDS
+        .iter()
+        .find(|site| !unsafe { guard_matches(site) })
+        .map(|s| s.name)
 }
 
 pub(super) struct Worker {
@@ -81,7 +94,7 @@ impl Worker {
         };
         worker.discover(now);
         if worker.provider.is_some() {
-            REGISTERED_AT_START.store(true, Ordering::Release);
+            unsafe { nn::os::SignalEvent(REGISTERED_AT_START.0.get().cast()) };
         }
         unsafe {
             nn::os::SignalEvent(event());
@@ -137,6 +150,7 @@ pub(super) unsafe fn observe(screen: Screen, object: u64, view: Option<View>) {
         return;
     };
     let previous_token = owner.latest.p1_carried;
+    let previous_seat = owner.latest.local_seat;
     owner.begin(
         Some((
             screen,
@@ -197,6 +211,15 @@ pub(super) unsafe fn observe(screen: Screen, object: u64, view: Option<View>) {
                 }
             }
             _ => {}
+        }
+    }
+    if screen == Screen::Css {
+        p1::collect(object, &view, sample);
+        if sample.local_seat != previous_seat {
+            sample.generation += 1;
+            sample.step.new_owner();
+            sample.resting = false;
+            sample.fighter = None;
         }
     }
     MAIL.offer(*sample);

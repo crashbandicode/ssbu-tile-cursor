@@ -226,42 +226,101 @@ fn overwritten_mailbox_preserves_newest_complete_owner_and_counters() {
 fn observed_default_steve_requires_matching_typed_tile_and_current_panel() {
     let typed = 0xc100_700f_dc91_574e;
     let good = |panel, tile, variant, settled| fighter_identity(panel, tile, variant, settled);
-    assert_eq!(good(typed, typed, [0,0], true), Some(Fighter::Steve));
-    assert_eq!(good(0xc1ff_ff00_0000_0000, typed, [0,0],true), None);
-    assert_eq!(good(typed, typed, [1,0],true), None);
-    assert_eq!(good(typed, typed, [0,1],true), None);
-    assert_eq!(good(typed, typed, [0,0],false), None);
-    assert_eq!(good(typed, typed ^ 1, [0,0],true), None);
+    assert_eq!(good(typed, typed, [0, 0], true), Some(Fighter::Steve));
+    assert_eq!(good(0xc1ff_ff00_0000_0000, typed, [0, 0], true), None);
+    assert_eq!(good(typed, typed, [1, 0], true), None);
+    assert_eq!(good(typed, typed, [0, 1], true), None);
+    assert_eq!(good(typed, typed, [0, 0], false), None);
+    assert_eq!(good(typed, typed ^ 1, [0, 0], true), None);
 }
 
 #[test]
 fn native_p1_medal_requires_own_slot_and_matching_committed_placement() {
     let mut p = MedalFacts {
-        carried:0, holding:1, visible:1, grabbed:1, panel_flags:[0,0],
-        placed:None, rect_matches:false, placed_fighter:None,
+        carried: 0,
+        holding: 1,
+        visible: 1,
+        grabbed: 1,
+        panel_flags: [0, 0],
+        placed: None,
+        rect_matches: false,
+        placed_fighter: None,
     };
     assert_eq!(p.token(), P1Token::Held);
-    p.carried=1;
+    p.carried = 1;
     assert_eq!(p.token(), P1Token::Unknown);
-    p.carried=-1; p.holding=0;
+    p.carried = -1;
+    p.holding = 0;
     assert_eq!(p.token(), P1Token::Unknown);
-    p.grabbed=0; p.panel_flags=[1,1]; p.placed=Some(78);
-    p.rect_matches=true; p.placed_fighter=Some(Fighter::Steve);
+    p.grabbed = 0;
+    p.panel_flags = [1, 1];
+    p.placed = Some(78);
+    p.rect_matches = true;
+    p.placed_fighter = Some(Fighter::Steve);
     assert_eq!(p.token(), P1Token::Placed);
-    p.rect_matches=false;
+    p.rect_matches = false;
     assert_eq!(p.token(), P1Token::Unknown);
-    p.rect_matches=true; p.visible=0;
+    p.rect_matches = true;
+    p.visible = 0;
     assert_eq!(p.token(), P1Token::Unknown);
+}
+
+#[test]
+fn qualified_native_p1_identity_is_separate_from_local_and_expires() {
+    let mut p = Publisher::default();
+    let mut s = Sample {
+        screen: Some(Screen::Css),
+        tick: 1,
+        observation: 1,
+        resting: true,
+        at: Some(78),
+        hover: Some(78),
+        p1_carried: Some(0),
+        p1_token: P1Token::Held,
+        fighter: Some(Fighter::Steve),
+        ..Sample::default()
+    };
+    let held = block(&mut p, 1, Some(s), true);
+    assert!(held.contains("\nkind=88\nname=\"Steve\"\nform=default\n"));
+    assert!(held.contains("\np1.token=held\n"));
+    assert!(held.contains("\np1.placed.kind=unknown\n"));
+    s.tick += 1;
+    s.observation += 1;
+    s.p1_carried = None;
+    s.fighter = None;
+    s.hover = None;
+    s.p1_token = P1Token::Placed;
+    s.p1_placed = Some((78, Fighter::Steve));
+    let placed = block(&mut p, 2, Some(s), true);
+    assert!(placed.contains("\np1.token=placed\np1.placed.at=78\np1.placed.kind=88\np1.placed.name=\"Steve\"\np1.placed.form=default\n"));
+    assert!(placed.contains("\nkind=unknown\n"));
+    for key in [
+        "seat",
+        "controller",
+        "carried",
+        "local.token",
+        "placed.kind",
+    ] {
+        assert!(placed.contains(&format!("\n{key}=unknown\n")));
+    }
+    let expired = block(&mut p, 3 + MAX_AGE, None, true);
+    for key in ["p1.token", "p1.placed.kind", "kind"] {
+        assert!(expired.contains(&format!("\n{key}=unknown\n")));
+    }
 }
 
 #[test]
 fn direct_local_pad_requires_an_exact_distinct_slot_in_the_observed_rosters() {
     let roster = |count: usize, local: usize| -> Vec<SeatInput> {
-        (0..count).map(|i| SeatInput {
-            slot: i as i32, config: i as i32 + 1, active: 1,
-            input: 0x10000 + 0x500 * i as u64,
-            pad: if i == local { [0, 0, 0] } else { [0, -1, -1] }
-        }).collect()
+        (0..count)
+            .map(|i| SeatInput {
+                slot: i as i32,
+                config: i as i32 + 1,
+                active: 1,
+                input: 0x10000 + 0x500 * i as u64,
+                pad: if i == local { [0, 0, 0] } else { [0, -1, -1] },
+            })
+            .collect()
     };
     let mut offline = roster(2, 0);
     let mut guest = roster(8, 1);
@@ -271,7 +330,7 @@ fn direct_local_pad_requires_an_exact_distinct_slot_in_the_observed_rosters() {
     assert_eq!(local_seat(&guest), None);
     guest[0].pad = [0, 0, 0];
     assert_eq!(local_seat(&guest), None);
-    guest[0].pad = [0,-1,-1];
+    guest[0].pad = [0, -1, -1];
     guest[1].input = guest[0].input;
     assert_eq!(local_seat(&guest), None);
     offline[0].config = 2;
@@ -285,4 +344,77 @@ fn direct_local_pad_requires_an_exact_distinct_slot_in_the_observed_rosters() {
     let mut inactive = roster(8, 1);
     inactive[1].active = 0;
     assert_eq!(local_seat(&inactive), None);
+}
+
+#[test]
+fn guest_seat_identity_does_not_publish_native_p1_geometry_as_a_local_hover() {
+    let mut s = Sample {
+        screen: Some(Screen::Css),
+        local_seat: Some(1),
+        at: Some(78),
+        hover: Some(78),
+        fighter: Some(Fighter::Steve),
+        tick: 1,
+        observation: 1,
+        resting: true,
+        p1_carried: Some(0),
+        p1_token: P1Token::Held,
+        ..Sample::default()
+    };
+    s.step.emitted(word(Dir::Up, None, Some(78)));
+    let block = block(&mut Publisher::default(), 1, Some(s), true);
+    for row in [
+        "controller=0",
+        "seat=1",
+        "at=unknown",
+        "hovered=unknown",
+        "kind=unknown",
+        "local.token=unknown",
+        "settled=0",
+        "ack.result=unknown",
+        "direction=unknown",
+        "p1.token=held",
+    ] {
+        assert!(block.contains(&format!("\n{row}\n")), "{row}");
+    }
+}
+
+#[test]
+fn offline_local_identity_requires_positive_owned_medal_and_direct_seat_zero() {
+    let mut p = Publisher::default();
+    let mut s = Sample {
+        screen: Some(Screen::Css),
+        local_seat: Some(0),
+        tick: 1,
+        observation: 1,
+        p1_carried: Some(0),
+        p1_token: P1Token::Held,
+        ..Sample::default()
+    };
+    let held = block(&mut p, 1, Some(s), true);
+    for row in [
+        "controller=0",
+        "seat=0",
+        "carried=0",
+        "local.token=held",
+        "placed.kind=unknown",
+    ] {
+        assert!(held.contains(&format!("\n{row}\n")));
+    }
+    s.tick = 2;
+    s.observation = 2;
+    s.p1_carried = None;
+    s.p1_token = P1Token::Placed;
+    s.p1_placed = Some((78, Fighter::Steve));
+    let placed = block(&mut p, 2, Some(s), true);
+    for row in [
+        "carried=none",
+        "local.token=placed",
+        "placed.at=78",
+        "placed.kind=88",
+        "placed.name=\"Steve\"",
+        "placed.form=default",
+    ] {
+        assert!(placed.contains(&format!("\n{row}\n")));
+    }
 }
