@@ -253,3 +253,36 @@ fn native_p1_medal_requires_own_slot_and_matching_committed_placement() {
     p.rect_matches=true; p.visible=0;
     assert_eq!(p.token(), P1Token::Unknown);
 }
+
+#[test]
+fn direct_local_pad_requires_an_exact_distinct_slot_in_the_observed_rosters() {
+    let roster = |count: usize, local: usize| -> Vec<SeatInput> {
+        (0..count).map(|i| SeatInput {
+            slot: i as i32, config: i as i32 + 1, active: 1,
+            input: 0x10000 + 0x500 * i as u64,
+            pad: if i == local { [0, 0, 0] } else { [0, -1, -1] }
+        }).collect()
+    };
+    let mut offline = roster(2, 0);
+    let mut guest = roster(8, 1);
+    assert_eq!(local_seat(&offline), Some(0));
+    assert_eq!(local_seat(&guest), Some(1));
+    guest[0].pad = [0, -1, 0]; // aggregate/cached index alone
+    assert_eq!(local_seat(&guest), None);
+    guest[0].pad = [0, 0, 0];
+    assert_eq!(local_seat(&guest), None);
+    guest[0].pad = [0,-1,-1];
+    guest[1].input = guest[0].input;
+    assert_eq!(local_seat(&guest), None);
+    offline[0].config = 2;
+    assert_eq!(local_seat(&offline), None);
+    assert_eq!(local_seat(&roster(2, 1)), None);
+    assert_eq!(local_seat(&roster(8, 0)), None);
+    assert_eq!(local_seat(&roster(3, 1)), None);
+    let mut duplicate = roster(8, 1);
+    duplicate[1].slot = 0;
+    assert_eq!(local_seat(&duplicate), None);
+    let mut inactive = roster(8, 1);
+    inactive[1].active = 0;
+    assert_eq!(local_seat(&inactive), None);
+}
