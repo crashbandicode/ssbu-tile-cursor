@@ -240,6 +240,9 @@ unsafe fn hand_cursor(hand: u64) -> Option<(u64, bool)> {
     valid(cursor).then(|| (cursor, read_u8(hand + hand::ENABLED as u64) != 0))
 }
 
+// The accepted release inlines both view builders into its standalone hooks.
+// Keep that codegen when the observed owners introduce a second caller.
+#[inline(always)]
 unsafe fn css_view(css: u64) -> Option<View> {
     use model::css::*;
     let (begin, end) = (
@@ -273,6 +276,7 @@ unsafe fn css_view(css: u64) -> Option<View> {
     })
 }
 
+#[inline(always)]
 unsafe fn sss_view(sss: u64) -> Option<View> {
     use model::sss::*;
     let (cursor, enabled) = hand_cursor(read_u64(sss + HAND as u64))?;
