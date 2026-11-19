@@ -253,11 +253,14 @@ fn native_p1_medal_requires_own_slot_and_matching_committed_placement() {
     p.holding = 0;
     assert_eq!(p.token(), P1Token::Unknown);
     p.grabbed = 0;
-    p.panel_flags = [1, 1];
+    p.panel_flags = [0, 1];
     p.placed = Some(78);
     p.rect_matches = true;
     p.placed_fighter = Some(Fighter::Steve);
     assert_eq!(p.token(), P1Token::Placed);
+    p.panel_flags = [1, 1];
+    assert_eq!(p.token(), P1Token::Unknown);
+    p.panel_flags = [0, 1];
     p.rect_matches = false;
     assert_eq!(p.token(), P1Token::Unknown);
     p.rect_matches = true;
@@ -417,4 +420,23 @@ fn offline_local_identity_requires_positive_owned_medal_and_direct_seat_zero() {
     ] {
         assert!(placed.contains(&format!("\n{row}\n")));
     }
+}
+
+#[test]
+fn captured_vectors_reproduce_offline_entry_and_normal_stage_neighbors() {
+    use crate::model::{neighbour, Rect};
+    let rect = |b: &[u8]| {
+        let f = |i: usize| f32::from_le_bytes(b[i..i+4].try_into().unwrap());
+        Rect { xmin:f(0), xmax:f(4), ymin:f(8), ymax:f(12) }
+    };
+    let css = include_bytes!("layouts/css.bin");
+    let tiles: Vec<_> = css[16..].chunks_exact(32).map(|r|rect(&r[16..])).collect();
+    let step = neighbour(tiles.as_slice(), (-599.,-236.), Dir::Up, &rect(css));
+    assert_eq!((step.from,step.to,step.target), (None,Some(78),(-576.,-77.)));
+    let sss = include_bytes!("layouts/sss.bin");
+    let tiles: Vec<_> = sss[16..].chunks_exact(24).map(|r|rect(&r[8..])).collect();
+    let step = neighbour(tiles.as_slice(), (-189.,358.), Dir::Right, &rect(sss));
+    assert_eq!((step.from,step.to,step.target), (Some(0),Some(1),(-126.,394.)));
+    let second = neighbour(tiles.as_slice(), step.target, Dir::Right, &rect(sss));
+    assert_eq!(second.to,Some(2));
 }
