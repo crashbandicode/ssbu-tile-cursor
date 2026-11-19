@@ -221,3 +221,35 @@ fn overwritten_mailbox_preserves_newest_complete_owner_and_counters() {
     m.offer(a);
     assert_eq!(m.read(), Some(a));
 }
+
+#[test]
+fn observed_default_steve_requires_matching_typed_tile_and_current_panel() {
+    let typed = 0xc100_700f_dc91_574e;
+    let good = |panel, tile, variant, settled| fighter_identity(panel, tile, variant, settled);
+    assert_eq!(good(typed, typed, [0,0], true), Some(Fighter::Steve));
+    assert_eq!(good(0xc1ff_ff00_0000_0000, typed, [0,0],true), None);
+    assert_eq!(good(typed, typed, [1,0],true), None);
+    assert_eq!(good(typed, typed, [0,1],true), None);
+    assert_eq!(good(typed, typed, [0,0],false), None);
+    assert_eq!(good(typed, typed ^ 1, [0,0],true), None);
+}
+
+#[test]
+fn native_p1_medal_requires_own_slot_and_matching_committed_placement() {
+    let mut p = MedalFacts {
+        carried:0, holding:1, visible:1, grabbed:1, panel_flags:[0,0],
+        placed:None, rect_matches:false, placed_fighter:None,
+    };
+    assert_eq!(p.token(), P1Token::Held);
+    p.carried=1;
+    assert_eq!(p.token(), P1Token::Unknown);
+    p.carried=-1; p.holding=0;
+    assert_eq!(p.token(), P1Token::Unknown);
+    p.grabbed=0; p.panel_flags=[1,1]; p.placed=Some(78);
+    p.rect_matches=true; p.placed_fighter=Some(Fighter::Steve);
+    assert_eq!(p.token(), P1Token::Placed);
+    p.rect_matches=false;
+    assert_eq!(p.token(), P1Token::Unknown);
+    p.rect_matches=true; p.visible=0;
+    assert_eq!(p.token(), P1Token::Unknown);
+}
