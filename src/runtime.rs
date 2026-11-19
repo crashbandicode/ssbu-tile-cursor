@@ -22,6 +22,9 @@ use skyline::nn;
 use std::alloc::{GlobalAlloc, Layout, System};
 use std::sync::atomic::{AtomicU64, Ordering};
 
+#[path = "observed.rs"]
+mod observed;
+
 const DATA_DIR: &str = "sd:/ultimate/ssbu-tile-cursor";
 const EVENT_RING: usize = 64;
 const WRITER_STACK: usize = 16 * 1024;
@@ -407,6 +410,36 @@ unsafe fn tile_cursor_sss(ctx: &InlineCtx) {
     }
 }
 
+/// Alternative owners installed at startup on the same two guarded sites.
+/// The standalone owners and the cursor-query implementation above stay independent.
+#[skyline::hook(offset = model::CSS_PLAYERS_OFFSET, inline)]
+unsafe fn observed_css(ctx: &InlineCtx) {
+    let css = ctx.registers[0].x();
+    observed::observe(
+        Screen::Css,
+        css,
+        valid(css).then(|| css_view(css)).flatten(),
+    );
+}
+
+#[skyline::hook(offset = model::SSS_UPDATE_OFFSET, inline)]
+unsafe fn observed_sss(ctx: &InlineCtx) {
+    let sss = ctx.registers[0].x();
+    observed::observe(
+        Screen::Sss,
+        sss,
+        valid(sss).then(|| sss_view(sss)).flatten(),
+    );
+}
+
+fn install_cursor_hooks(observe: bool) {
+    if observe {
+        skyline::install_hooks!(observed_css, observed_sss, tile_cursor_query);
+    } else {
+        skyline::install_hooks!(tile_cursor_css, tile_cursor_sss, tile_cursor_query);
+    }
+}
+
 /// In the cursor update, before `mov x0, x20; bl` (the stick/D-pad query):
 /// for P1's hand while it may step and L3 is held, x20 becomes a context
 /// whose input object is a copy of the real one with the four D-pad words
@@ -513,6 +546,7 @@ fn append_log(bytes: &[u8]) {
 
 /// Drains the event ring into `events.log` every 100 ms.
 fn writer_run() -> ! {
+    let mut provider = observed::Worker::start();
     let mut tail = 0u64;
     let mut line = Line::<160>::new();
     loop {
@@ -521,6 +555,7 @@ fn writer_run() -> ! {
                 nanoseconds: 100_000_000,
             })
         };
+        provider.poll();
         let head = EVENT_HEAD.load(Ordering::Acquire);
         if head.saturating_sub(tail) > EVENT_RING as u64 {
             tail = head - EVENT_RING as u64;
@@ -643,12 +678,18 @@ pub fn main() {
         report_install(&mut report);
         return;
     }
-    skyline::install_hooks!(tile_cursor_css, tile_cursor_sss, tile_cursor_query);
-    let _ = write!(report, " hooks=css,sss,cursor_query");
-    // The writer appends to the same log, so it starts only after this line
-    // (and the folder) exist.
+    observed::initialize();
+    let writer = start_writer();
+    let observe = writer && observed::wait_for_registration() && observed::stock_build();
+    install_cursor_hooks(observe);
+    let _ = write!(
+        report,
+        " hooks=css,sss,cursor_query observed={}",
+        u8::from(observe)
+    );
     report_install(&mut report);
-    if !start_writer() {
+    observed::installation_reported();
+    if !writer {
         report.clear();
         let _ = write!(report, "{} writer=not_started", tick());
         report_install(&mut report);
