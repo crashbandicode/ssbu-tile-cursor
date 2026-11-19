@@ -95,6 +95,7 @@ pub struct Step {
     pub dir: Option<Dir>,
     pub from: Option<u16>,
     pub to: Option<u16>,
+    pub token: Option<u16>,
     pub last_written: u64,
     pub settled_ack: Option<u64>,
 }
@@ -109,6 +110,7 @@ impl Step {
         self.dir = Dir::from_code((word >> 8) as u8);
         self.from = index(16);
         self.to = index(32);
+        self.token = index(48);
         self.settled_ack = None;
         if self.to.is_some() {
             self.applied += 1;
@@ -117,8 +119,13 @@ impl Step {
     }
 
     /// An edge can never settle. The CSS/SSS owner independently confirms native hover.
-    pub fn settled(&mut self, at: Option<u16>, native: Option<u16>) {
-        if self.to.is_some() && self.ack == self.last_written && self.to == at && at == native {
+    pub fn settled(&mut self, at: Option<u16>, native: Option<u16>, token: Option<u16>) {
+        if self.to.is_some()
+            && self.ack == self.last_written
+            && self.token == token
+            && self.to == at
+            && at == native
+        {
             self.settled_ack = Some(self.ack);
         }
     }
@@ -148,7 +155,7 @@ pub struct Sample {
 #[derive(Default)]
 pub struct Owner {
     /// Used only on the owner thread, for identity comparison, never dereferenced later.
-    key: Option<(Screen, u64, u64, usize)>,
+    key: Option<(Screen, u64, u64, u64, usize)>,
     pub latest: Sample,
 }
 
@@ -171,6 +178,7 @@ impl Owner {
                     dir: None,
                     from: None,
                     to: None,
+                    token: None,
                     last_written: 0,
                     settled_ack: None,
                 },
@@ -178,7 +186,7 @@ impl Owner {
         }
     }
 
-    pub fn begin(&mut self, key: Option<(Screen, u64, u64, usize)>, now: u64) {
+    pub fn begin(&mut self, key: Option<(Screen, u64, u64, u64, usize)>, now: u64) {
         if self.key != key || now.saturating_sub(self.latest.tick) > MAX_AGE {
             self.latest.generation += 1;
             self.latest.step.new_owner();
@@ -298,9 +306,10 @@ impl Publisher {
             _ => Endpoint::Unknown,
         };
         let settled = active && s.resting && s.at.is_some() && s.at == s.hover;
+        let step_still_matches = settled && s.at == step.to && step.token == s.p1_carried;
         let _ = write!(buf, "schema=tile.cursor/1\nrev={rev}\nboot=0\nack={}\nack.result={result}\nfocus=unknown\nobservation={}\nobservation.active={}", step.ack, s.observation, u8::from(active));
         let _ = write!(buf, "\nscreen={}\ngeneration={}\nlayout=unknown\nat={}\nhovered={}\nkind=unknown\nname=unknown\nform=unknown", Field(active.then_some(s.screen).flatten().map(Screen::name)), Field(active.then_some(s.generation)), Field(valid(s.at)), Field(valid(s.hover)));
-        let _ = write!(buf, "\ncontroller=unknown\nseat=unknown\ncarried=unknown\np1.carried={}\np1.token=unknown\nlocal.token=unknown\nplaced.at=unknown\nplaced.kind=unknown\nplaced.name=unknown\nplaced.form=unknown\nsettled={}\napplied={}\ndirection={}\nfrom={}\nto={}\nresult={result}\nsettled.ack={}", Field(valid(s.p1_carried)), u8::from(settled), step.applied, Field(active.then_some(step.dir).flatten().map(Dir::name)), endpoint(step.from), endpoint(step.to), Field(settled.then_some(step.settled_ack).flatten()));
+        let _ = write!(buf, "\ncontroller=unknown\nseat=unknown\ncarried=unknown\np1.carried={}\np1.token=unknown\nlocal.token=unknown\nplaced.at=unknown\nplaced.kind=unknown\nplaced.name=unknown\nplaced.form=unknown\nsettled={}\napplied={}\ndirection={}\nfrom={}\nto={}\nresult={result}\nsettled.ack={}", Field(valid(s.p1_carried)), u8::from(settled), step.applied, Field(active.then_some(step.dir).flatten().map(Dir::name)), endpoint(step.from), endpoint(step.to), Field(step_still_matches.then_some(step.settled_ack).flatten()));
         if send(buf.as_bytes()) {
             self.revision = rev;
             self.sent = Some(identity);

@@ -136,8 +136,15 @@ pub(super) unsafe fn observe(screen: Screen, object: u64, view: Option<View>) {
         MAIL.offer(owner.latest);
         return;
     };
+    let previous_token = owner.latest.p1_carried;
     owner.begin(
-        Some((screen, object, view.tiles.begin, view.tiles.count)),
+        Some((
+            screen,
+            object,
+            view.cursor,
+            view.tiles.begin,
+            view.tiles.count,
+        )),
         now,
     );
     // on_screen is the accepted movement implementation, called exactly once.
@@ -151,6 +158,10 @@ pub(super) unsafe fn observe(screen: Screen, object: u64, view: Option<View>) {
     let target = read_point(view.cursor + cursor::TARGET as u64);
     sample.at = tile_at(&view.tiles, current).map(|i| i as u16);
     sample.p1_carried = view.token.map(|i| i as u16);
+    if sample.p1_carried != previous_token {
+        sample.step.settled_ack = None;
+        sample.step.last_written = 0;
+    }
     sample.hover = view
         .records
         .zip(view.token.and_then(model::css::hover_record))
@@ -161,15 +172,31 @@ pub(super) unsafe fn observe(screen: Screen, object: u64, view: Option<View>) {
     let rest = (current == target).then_some((sample.generation, view.cursor, current));
     sample.resting = rest.is_some() && *REST.0.get() == rest;
     *REST.0.get() = rest;
-    if last - first <= 3 {
-        for index in first..last {
-            let slot = &EVENTS[(index % EVENT_RING as u64) as usize];
-            let code = slot.code.load(Ordering::Relaxed) as u8;
-            match code {
-                EV_STEP => sample.step.emitted(slot.a.load(Ordering::Relaxed)),
-                EV_SETTLED => sample.step.settled(sample.at, sample.hover),
-                _ => {}
+    if last - first > 3 {
+        // The accepted owner produces at most SCREEN, SETTLED, STEP. A violated
+        // producer bound cannot certify counters or an input outcome.
+        owner.begin(None, now);
+        MAIL.offer(owner.latest);
+        return;
+    }
+    for index in first..last {
+        let slot = &EVENTS[(index % EVENT_RING as u64) as usize];
+        let code = slot.code.load(Ordering::Relaxed) as u8;
+        match code {
+            EV_STEP => sample.step.emitted(slot.a.load(Ordering::Relaxed)),
+            EV_SETTLED => {
+                let record = slot.a.load(Ordering::Relaxed);
+                // Require the original settle_token's native hover AND today's
+                // current-token hover. Pickup may switch tokens during easing.
+                if sample.at == Some((record >> 16) as u16)
+                    && sample.hover == Some((record >> 32) as u16)
+                {
+                    sample
+                        .step
+                        .settled(sample.at, sample.hover, sample.p1_carried);
+                }
             }
+            _ => {}
         }
     }
     MAIL.offer(*sample);

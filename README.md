@@ -56,6 +56,22 @@ Everything is written to `sd:/ultimate/ssbu-tile-cursor/events.log`:
 
 A tick is 1/19.2 MHz.
 
+## Optional bridge state
+
+A compatible bridge can register Tile Cursor as `tile.cursor/1`. The writer
+polls for the export at most once per second for the first 30 seconds. The
+startup hook installer chooses the observed CSS/SSS callbacks only if the
+first poll registered successfully and the full 13.0.5 build note matches. A
+later registration can expose an inactive block. The standalone callbacks
+continue to handle cursor movement when initial registration is absent.
+
+The provider distinguishes movement attempts (`ack`), successful target
+writes (`applied`), and the handled step that reached its native hover
+(`settled.ack`). `p1.carried` is the native slot-zero hand's carried token.
+The local controller, exact target identity, committed token, layout
+and local-seat fields require qualification against the release fixture.
+They currently report `unknown`. A stale owner expires after 300 ms.
+
 ## Build
 
 ```text

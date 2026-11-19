@@ -100,29 +100,31 @@ fn block(p: &mut Publisher, now: u64, s: Option<Sample>, accept: bool) -> String
 fn actual_write_ack_and_settlement_have_distinct_clocks() {
     let mut step = Step::default();
     step.emitted(word(Dir::Left, Some(0), None));
-    step.settled(Some(0), Some(0));
+    step.settled(Some(0), Some(0), Some(0));
     assert_eq!((step.ack, step.applied, step.settled_ack), (1, 0, None));
     step.emitted(word(Dir::Right, Some(0), Some(1)));
-    step.settled(Some(1), None);
-    step.settled(Some(1), Some(0));
+    step.settled(Some(1), None, Some(0));
+    step.settled(Some(1), Some(0), Some(0));
     assert_eq!((step.ack, step.applied, step.settled_ack), (2, 1, None));
-    step.settled(Some(1), Some(1));
+    step.settled(Some(1), Some(1), Some(1));
+    assert_eq!(step.settled_ack, None);
+    step.settled(Some(1), Some(1), Some(0));
     assert_eq!(
         (step.dir, step.from, step.to, step.settled_ack),
         (Some(Dir::Right), Some(0), Some(1), Some(2))
     );
     step.emitted(word(Dir::Right, Some(1), None));
-    step.settled(Some(1), Some(1));
+    step.settled(Some(1), Some(1), Some(0));
     assert_eq!((step.applied, step.settled_ack), (1, None));
 }
 
 #[test]
 fn replaced_owner_or_expired_heartbeat_cannot_inherit_settlement() {
     let mut o = Owner::new();
-    let css = Some((Screen::Css, 100, 200, 86));
+    let css = Some((Screen::Css, 100, 150, 200, 86));
     o.begin(css, 1);
     o.latest.step.emitted(word(Dir::Right, Some(2), Some(3)));
-    o.latest.step.settled(Some(3), Some(3));
+    o.latest.step.settled(Some(3), Some(3), Some(0));
     o.begin(css, 2);
     assert_eq!(o.latest.step.settled_ack, Some(1));
     o.begin(css, MAX_AGE + 3);
@@ -134,7 +136,7 @@ fn replaced_owner_or_expired_heartbeat_cannot_inherit_settlement() {
         ),
         (2, 1, None)
     );
-    o.begin(Some((Screen::Sss, 100, 200, 86)), MAX_AGE + 4);
+    o.begin(Some((Screen::Sss, 100, 150, 200, 86)), MAX_AGE + 4);
     assert_eq!(o.latest.generation, 3);
     o.begin(None, MAX_AGE + 5);
     assert_eq!(o.latest.screen, None);
@@ -144,13 +146,13 @@ fn replaced_owner_or_expired_heartbeat_cannot_inherit_settlement() {
 fn drops_retry_latest_and_heartbeat_expiry_publishes_unknown() {
     let mut p = Publisher::default();
     let mut o = Owner::new();
-    o.begin(Some((Screen::Css, 100, 200, 86)), 1);
+    o.begin(Some((Screen::Css, 100, 150, 200, 86)), 1);
     o.latest.at = Some(1);
     let first = block(&mut p, 1, Some(o.latest), false);
     assert!(first.starts_with(
         "schema=tile.cursor/1\nrev=1\nboot=0\nack=0\nack.result=unknown\nfocus=unknown\n"
     ));
-    o.begin(Some((Screen::Css, 100, 200, 86)), 2);
+    o.begin(Some((Screen::Css, 100, 150, 200, 86)), 2);
     o.latest.at = Some(2);
     let new = block(&mut p, 2, Some(o.latest), true);
     assert!(
