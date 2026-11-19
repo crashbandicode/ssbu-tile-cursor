@@ -682,11 +682,10 @@ pub fn main() {
     let writer = start_writer();
     let observe = writer && observed::wait_for_registration() && observed::stock_build();
     install_cursor_hooks(observe);
-    let _ = write!(
-        report,
-        " hooks=css,sss,cursor_query observed={}",
-        u8::from(observe)
-    );
+    let _ = write!(report, " hooks=css,sss,cursor_query");
+    if observe {
+        let _ = write!(report, " observed=1");
+    }
     report_install(&mut report);
     observed::installation_reported();
     if !writer {
