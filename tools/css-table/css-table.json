@@ -1,0 +1,2780 @@
+{
+ "screen": "css",
+ "tiles": [
+  {
+   "tile": 0,
+   "ui_rows": [
+    1
+   ],
+   "name_ids": [
+    "mario"
+   ],
+   "ui_chara_ids": [
+    "ui_chara_mario"
+   ],
+   "word": "0xc100010edaf3c863",
+   "alternate": "0xc1ffff0000000000",
+   "fighter_kind": "0x1254206ce1",
+   "kind": 0,
+   "kind_rule": "main kind table index",
+   "label_key": "nam_chr1_00_mario",
+   "name": "Mario",
+   "disp_order": 0,
+   "dlc": false,
+   "mii": false,
+   "hover_focus": "css.grid.mario",
+   "placed_focus": "css.medal.mario",
+   "slot": "set_parts_chr_s_00",
+   "rect": [
+    -936.0,
+    -792.0,
+    374.0,
+    456.0
+   ]
+  },
+  {
+   "tile": 1,
+   "ui_rows": [
+    2
+   ],
+   "name_ids": [
+    "donkey"
+   ],
+   "ui_chara_ids": [
+    "ui_chara_donkey"
+   ],
+   "word": "0xc100020f5421de55",
+   "alternate": "0xc1ffff0000000000",
+   "fighter_kind": "0x135719effd",
+   "kind": 1,
+   "kind_rule": "main kind table index",
+   "label_key": "nam_chr1_00_donkey",
+   "name": "Donkey Kong",
+   "disp_order": 1,
+   "dlc": false,
+   "mii": false,
+   "hover_focus": "css.grid.donkey",
+   "placed_focus": "css.medal.donkey",
+   "slot": "set_parts_chr_s_01",
+   "rect": [
+    -792.0,
+    -648.0,
+    374.0,
+    456.0
+   ]
+  },
+  {
+   "tile": 2,
+   "ui_rows": [
+    3
+   ],
+   "name_ids": [
+    "link"
+   ],
+   "ui_chara_ids": [
+    "ui_chara_link"
+   ],
+   "word": "0xc100030d22ccc98e",
+   "alternate": "0xc1ffff0000000000",
+   "fighter_kind": "0x114f87b213",
+   "kind": 2,
+   "kind_rule": "main kind table index",
+   "label_key": "nam_chr1_00_link",
+   "name": "Link",
+   "disp_order": 2,
+   "dlc": false,
+   "mii": false,
+   "hover_focus": "css.grid.link",
+   "placed_focus": "css.medal.link",
+   "slot": "set_parts_chr_s_02",
+   "rect": [
+    -648.0,
+    -504.0,
+    374.0,
+    456.0
+   ]
+  },
+  {
+   "tile": 3,
+   "ui_rows": [
+    4
+   ],
+   "name_ids": [
+    "samus"
+   ],
+   "ui_chara_ids": [
+    "ui_chara_samus"
+   ],
+   "word": "0xc100040ee02f04df",
+   "alternate": "0xc1ffff0000000000",
+   "fighter_kind": "0x126efca05d",
+   "kind": 3,
+   "kind_rule": "main kind table index",
+   "label_key": "nam_chr1_00_samus",
+   "name": "Samus",
+   "disp_order": 3,
+   "dlc": false,
+   "mii": false,
+   "hover_focus": "css.grid.samus",
+   "placed_focus": "css.medal.samus",
+   "slot": "set_parts_chr_s_03",
+   "rect": [
+    -504.0,
+    -360.0,
+    374.0,
+    456.0
+   ]
+  },
+  {
+   "tile": 4,
+   "ui_rows": [
+    5
+   ],
+   "name_ids": [
+    "samusd"
+   ],
+   "ui_chara_ids": [
+    "ui_chara_samusd"
+   ],
+   "word": "0xc100050f8e51aa8d",
+   "alternate": "0xc1ffff0000000000",
+   "fighter_kind": "0x138d699b25",
+   "kind": 4,
+   "kind_rule": "main kind table index",
+   "label_key": "nam_chr1_00_samusd",
+   "name": "Dark Samus",
+   "disp_order": 4,
+   "dlc": false,
+   "mii": false,
+   "hover_focus": "css.grid.samusd",
+   "placed_focus": "css.medal.samusd",
+   "slot": "set_parts_chr_s_04",
+   "rect": [
+    -360.0,
+    -216.0,
+    374.0,
+    456.0
+   ]
+  },
+  {
+   "tile": 5,
+   "ui_rows": [
+    6
+   ],
+   "name_ids": [
+    "yoshi"
+   ],
+   "ui_chara_ids": [
+    "ui_chara_yoshi"
+   ],
+   "word": "0xc100060e5ef67051",
+   "alternate": "0xc1ffff0000000000",
+   "fighter_kind": "0x12d025d4d3",
+   "kind": 5,
+   "kind_rule": "main kind table index",
+   "label_key": "nam_chr1_00_yoshi",
+   "name": "Yoshi",
+   "disp_order": 5,
+   "dlc": false,
+   "mii": false,
+   "hover_focus": "css.grid.yoshi",
+   "placed_focus": "css.medal.yoshi",
+   "slot": "set_parts_chr_s_05",
+   "rect": [
+    -216.0,
+    -72.0,
+    374.0,
+    456.0
+   ]
+  },
+  {
+   "tile": 6,
+   "ui_rows": [
+    7
+   ],
+   "name_ids": [
+    "kirby"
+   ],
+   "ui_chara_ids": [
+    "ui_chara_kirby"
+   ],
+   "word": "0xc100070e872779b6",
+   "alternate": "0xc1ffff0000000000",
+   "fighter_kind": "0x1209f4dd34",
+   "kind": 6,
+   "kind_rule": "main kind table index",
+   "label_key": "nam_chr1_00_kirby",
+   "name": "Kirby",
+   "disp_order": 6,
+   "dlc": false,
+   "mii": false,
+   "hover_focus": "css.grid.kirby",
+   "placed_focus": "css.medal.kirby",
+   "slot": "set_parts_chr_s_06",
+   "rect": [
+    -72.0,
+    72.0,
+    374.0,
+    456.0
+   ]
+  },
+  {
+   "tile": 7,
+   "ui_rows": [
+    8
+   ],
+   "name_ids": [
+    "fox"
+   ],
+   "ui_chara_ids": [
+    "ui_chara_fox"
+   ],
+   "word": "0xc100080c6eacd0fa",
+   "alternate": "0xc1ffff0000000000",
+   "fighter_kind": "0x10f833a6ef",
+   "kind": 7,
+   "kind_rule": "main kind table index",
+   "label_key": "nam_chr1_00_fox",
+   "name": "Fox",
+   "disp_order": 7,
+   "dlc": false,
+   "mii": false,
+   "hover_focus": "css.grid.fox",
+   "placed_focus": "css.medal.fox",
+   "slot": "set_parts_chr_s_07",
+   "rect": [
+    72.0,
+    216.0,
+    374.0,
+    456.0
+   ]
+  },
+  {
+   "tile": 8,
+   "ui_rows": [
+    9
+   ],
+   "name_ids": [
+    "pikachu"
+   ],
+   "ui_chara_ids": [
+    "ui_chara_pikachu"
+   ],
+   "word": "0xc10009105cf985ed",
+   "alternate": "0xc1ffff0000000000",
+   "fighter_kind": "0x1484f79606",
+   "kind": 8,
+   "kind_rule": "main kind table index",
+   "label_key": "nam_chr1_00_pikachu",
+   "name": "Pikachu",
+   "disp_order": 8,
+   "dlc": false,
+   "mii": false,
+   "hover_focus": "css.grid.pikachu",
+   "placed_focus": "css.medal.pikachu",
+   "slot": "set_parts_chr_s_08",
+   "rect": [
+    216.0,
+    360.0,
+    374.0,
+    456.0
+   ]
+  },
+  {
+   "tile": 9,
+   "ui_rows": [
+    10
+   ],
+   "name_ids": [
+    "luigi"
+   ],
+   "ui_chara_ids": [
+    "ui_chara_luigi"
+   ],
+   "word": "0xc1000a0e5f7be531",
+   "alternate": "0xc1ffff0000000000",
+   "fighter_kind": "0x12d1a841b3",
+   "kind": 9,
+   "kind_rule": "main kind table index",
+   "label_key": "nam_chr1_00_luigi",
+   "name": "Luigi",
+   "disp_order": 9,
+   "dlc": false,
+   "mii": false,
+   "hover_focus": "css.grid.luigi",
+   "placed_focus": "css.medal.luigi",
+   "slot": "set_parts_chr_s_09",
+   "rect": [
+    360.0,
+    504.0,
+    374.0,
+    456.0
+   ]
+  },
+  {
+   "tile": 10,
+   "ui_rows": [
+    11
+   ],
+   "name_ids": [
+    "ness"
+   ],
+   "ui_chara_ids": [
+    "ui_chara_ness"
+   ],
+   "word": "0xc1000b0d6ddf0c2b",
+   "alternate": "0xc1ffff0000000000",
+   "fighter_kind": "0x11009477b6",
+   "kind": 10,
+   "kind_rule": "main kind table index",
+   "label_key": "nam_chr1_00_ness",
+   "name": "Ness",
+   "disp_order": 10,
+   "dlc": false,
+   "mii": false,
+   "hover_focus": "css.grid.ness",
+   "placed_focus": "css.medal.ness",
+   "slot": "set_parts_chr_s_10",
+   "rect": [
+    504.0,
+    648.0,
+    374.0,
+    456.0
+   ]
+  },
+  {
+   "tile": 11,
+   "ui_rows": [
+    12
+   ],
+   "name_ids": [
+    "captain"
+   ],
+   "ui_chara_ids": [
+    "ui_chara_captain"
+   ],
+   "word": "0xc1000c100691ac2e",
+   "alternate": "0xc1ffff0000000000",
+   "fighter_kind": "0x14de9fbfc5",
+   "kind": 11,
+   "kind_rule": "main kind table index",
+   "label_key": "nam_chr1_00_captain",
+   "name": "Captain Falcon",
+   "disp_order": 11,
+   "dlc": false,
+   "mii": false,
+   "hover_focus": "css.grid.captain",
+   "placed_focus": "css.medal.captain",
+   "slot": "set_parts_chr_s_11",
+   "rect": [
+    648.0,
+    792.0,
+    374.0,
+    456.0
+   ]
+  },
+  {
+   "tile": 12,
+   "ui_rows": [
+    13
+   ],
+   "name_ids": [
+    "purin"
+   ],
+   "ui_chara_ids": [
+    "ui_chara_purin"
+   ],
+   "word": "0xc1000d0eeaff6b0e",
+   "alternate": "0xc1ffff0000000000",
+   "fighter_kind": "0x12642ccf8c",
+   "kind": 12,
+   "kind_rule": "main kind table index",
+   "label_key": "nam_chr1_00_purin",
+   "name": "Jigglypuff",
+   "disp_order": 12,
+   "dlc": false,
+   "mii": false,
+   "hover_focus": "css.grid.purin",
+   "placed_focus": "css.medal.purin",
+   "slot": "set_parts_chr_s_12",
+   "rect": [
+    792.0,
+    936.0,
+    374.0,
+    456.0
+   ]
+  },
+  {
+   "tile": 13,
+   "ui_rows": [
+    14
+   ],
+   "name_ids": [
+    "peach"
+   ],
+   "ui_chara_ids": [
+    "ui_chara_peach"
+   ],
+   "word": "0xc1000e0eb70a6c07",
+   "alternate": "0xc1ffff0000000000",
+   "fighter_kind": "0x1239d9c885",
+   "kind": 13,
+   "kind_rule": "main kind table index",
+   "label_key": "nam_chr1_00_peach",
+   "name": "Peach",
+   "disp_order": 13,
+   "dlc": false,
+   "mii": false,
+   "hover_focus": "css.grid.peach",
+   "placed_focus": "css.medal.peach",
+   "slot": "set_parts_chr_s_13",
+   "rect": [
+    -936.0,
+    -792.0,
+    292.0,
+    374.0
+   ]
+  },
+  {
+   "tile": 14,
+   "ui_rows": [
+    15
+   ],
+   "name_ids": [
+    "daisy"
+   ],
+   "ui_chara_ids": [
+    "ui_chara_daisy"
+   ],
+   "word": "0xc1000f0e8369a909",
+   "alternate": "0xc1ffff0000000000",
+   "fighter_kind": "0x120dba0d8b",
+   "kind": 14,
+   "kind_rule": "main kind table index",
+   "label_key": "nam_chr1_00_daisy",
+   "name": "Daisy",
+   "disp_order": 14,
+   "dlc": false,
+   "mii": false,
+   "hover_focus": "css.grid.daisy",
+   "placed_focus": "css.medal.daisy",
+   "slot": "set_parts_chr_s_14",
+   "rect": [
+    -792.0,
+    -648.0,
+    292.0,
+    374.0
+   ]
+  },
+  {
+   "tile": 15,
+   "ui_rows": [
+    16
+   ],
+   "name_ids": [
+    "koopa"
+   ],
+   "ui_chara_ids": [
+    "ui_chara_koopa"
+   ],
+   "word": "0xc100100edd2afecc",
+   "alternate": "0xc1ffff0000000000",
+   "fighter_kind": "0x1253f95a4e",
+   "kind": 15,
+   "kind_rule": "main kind table index",
+   "label_key": "nam_chr1_00_koopa",
+   "name": "Bowser",
+   "disp_order": 15,
+   "dlc": false,
+   "mii": false,
+   "hover_focus": "css.grid.koopa",
+   "placed_focus": "css.medal.koopa",
+   "slot": "set_parts_chr_s_15",
+   "rect": [
+    -648.0,
+    -504.0,
+    292.0,
+    374.0
+   ]
+  },
+  {
+   "tile": 16,
+   "ui_rows": [
+    17
+   ],
+   "name_ids": [
+    "ice_climber"
+   ],
+   "ui_chara_ids": [
+    "ui_chara_ice_climber"
+   ],
+   "word": "0xc1001114c50faf14",
+   "alternate": "0xc1ffff0000000000",
+   "fighter_kind": "0x18cc9a036c",
+   "kind": 75,
+   "kind_rule": "leader fighter_kind_popo",
+   "label_key": "nam_chr1_00_ice_climber",
+   "name": "Ice Climbers",
+   "disp_order": 16,
+   "dlc": false,
+   "mii": false,
+   "hover_focus": "css.grid.ice_climber",
+   "placed_focus": "css.medal.ice_climber",
+   "slot": "set_parts_chr_s_16",
+   "rect": [
+    -504.0,
+    -360.0,
+    292.0,
+    374.0
+   ]
+  },
+  {
+   "tile": 17,
+   "ui_rows": [
+    18
+   ],
+   "name_ids": [
+    "sheik"
+   ],
+   "ui_chara_ids": [
+    "ui_chara_sheik"
+   ],
+   "word": "0xc100120e662fdfe6",
+   "alternate": "0xc1ffff0000000000",
+   "fighter_kind": "0x12e8fc7b64",
+   "kind": 16,
+   "kind_rule": "main kind table index",
+   "label_key": "nam_chr1_00_sheik",
+   "name": "Sheik",
+   "disp_order": 17,
+   "dlc": false,
+   "mii": false,
+   "hover_focus": "css.grid.sheik",
+   "placed_focus": "css.medal.sheik",
+   "slot": "set_parts_chr_s_17",
+   "rect": [
+    -360.0,
+    -216.0,
+    292.0,
+    374.0
+   ]
+  },
+  {
+   "tile": 18,
+   "ui_rows": [
+    19
+   ],
+   "name_ids": [
+    "zelda"
+   ],
+   "ui_chara_ids": [
+    "ui_chara_zelda"
+   ],
+   "word": "0xc100130ec3ffc996",
+   "alternate": "0xc1ffff0000000000",
+   "fighter_kind": "0x124d2c6d14",
+   "kind": 17,
+   "kind_rule": "main kind table index",
+   "label_key": "nam_chr1_00_zelda",
+   "name": "Zelda",
+   "disp_order": 18,
+   "dlc": false,
+   "mii": false,
+   "hover_focus": "css.grid.zelda",
+   "placed_focus": "css.medal.zelda",
+   "slot": "set_parts_chr_s_18",
+   "rect": [
+    -216.0,
+    -72.0,
+    292.0,
+    374.0
+   ]
+  },
+  {
+   "tile": 19,
+   "ui_rows": [
+    20
+   ],
+   "name_ids": [
+    "mariod"
+   ],
+   "ui_chara_ids": [
+    "ui_chara_mariod"
+   ],
+   "word": "0xc100140f4cbc89e6",
+   "alternate": "0xc1ffff0000000000",
+   "fighter_kind": "0x134f84b84e",
+   "kind": 18,
+   "kind_rule": "main kind table index",
+   "label_key": "nam_chr1_00_mariod",
+   "name": "Dr. Mario",
+   "disp_order": 19,
+   "dlc": false,
+   "mii": false,
+   "hover_focus": "css.grid.mariod",
+   "placed_focus": "css.medal.mariod",
+   "slot": "set_parts_chr_s_19",
+   "rect": [
+    -72.0,
+    72.0,
+    292.0,
+    374.0
+   ]
+  },
+  {
+   "tile": 20,
+   "ui_rows": [
+    21
+   ],
+   "name_ids": [
+    "pichu"
+   ],
+   "ui_chara_ids": [
+    "ui_chara_pichu"
+   ],
+   "word": "0xc100150e7eaab2c3",
+   "alternate": "0xc1ffff0000000000",
+   "fighter_kind": "0x12f0791641",
+   "kind": 19,
+   "kind_rule": "main kind table index",
+   "label_key": "nam_chr1_00_pichu",
+   "name": "Pichu",
+   "disp_order": 20,
+   "dlc": false,
+   "mii": false,
+   "hover_focus": "css.grid.pichu",
+   "placed_focus": "css.medal.pichu",
+   "slot": "set_parts_chr_s_20",
+   "rect": [
+    72.0,
+    216.0,
+    292.0,
+    374.0
+   ]
+  },
+  {
+   "tile": 21,
+   "ui_rows": [
+    22
+   ],
+   "name_ids": [
+    "falco"
+   ],
+   "ui_chara_ids": [
+    "ui_chara_falco"
+   ],
+   "word": "0xc100160e41749f82",
+   "alternate": "0xc1ffff0000000000",
+   "fighter_kind": "0x12cfa73b00",
+   "kind": 20,
+   "kind_rule": "main kind table index",
+   "label_key": "nam_chr1_00_falco",
+   "name": "Falco",
+   "disp_order": 21,
+   "dlc": false,
+   "mii": false,
+   "hover_focus": "css.grid.falco",
+   "placed_focus": "css.medal.falco",
+   "slot": "set_parts_chr_s_21",
+   "rect": [
+    216.0,
+    360.0,
+    292.0,
+    374.0
+   ]
+  },
+  {
+   "tile": 22,
+   "ui_rows": [
+    23
+   ],
+   "name_ids": [
+    "marth"
+   ],
+   "ui_chara_ids": [
+    "ui_chara_marth"
+   ],
+   "word": "0xc100170ebbfb31dc",
+   "alternate": "0xc1ffff0000000000",
+   "fighter_kind": "0x123528955e",
+   "kind": 21,
+   "kind_rule": "main kind table index",
+   "label_key": "nam_chr1_00_marth",
+   "name": "Marth",
+   "disp_order": 22,
+   "dlc": false,
+   "mii": false,
+   "hover_focus": "css.grid.marth",
+   "placed_focus": "css.medal.marth",
+   "slot": "set_parts_chr_s_22",
+   "rect": [
+    360.0,
+    504.0,
+    292.0,
+    374.0
+   ]
+  },
+  {
+   "tile": 23,
+   "ui_rows": [
+    24
+   ],
+   "name_ids": [
+    "lucina"
+   ],
+   "ui_chara_ids": [
+    "ui_chara_lucina"
+   ],
+   "word": "0xc100180f93549e35",
+   "alternate": "0xc1ffff0000000000",
+   "fighter_kind": "0x13906caf9d",
+   "kind": 22,
+   "kind_rule": "main kind table index",
+   "label_key": "nam_chr1_00_lucina",
+   "name": "Lucina",
+   "disp_order": 23,
+   "dlc": false,
+   "mii": false,
+   "hover_focus": "css.grid.lucina",
+   "placed_focus": "css.medal.lucina",
+   "slot": "set_parts_chr_s_23",
+   "rect": [
+    504.0,
+    648.0,
+    292.0,
+    374.0
+   ]
+  },
+  {
+   "tile": 24,
+   "ui_rows": [
+    25
+   ],
+   "name_ids": [
+    "younglink"
+   ],
+   "ui_chara_ids": [
+    "ui_chara_younglink"
+   ],
+   "word": "0xc1001912d560cbe8",
+   "alternate": "0xc1ffff0000000000",
+   "fighter_kind": "0x16ec54781f",
+   "kind": 23,
+   "kind_rule": "main kind table index",
+   "label_key": "nam_chr1_00_younglink",
+   "name": "Young Link",
+   "disp_order": 24,
+   "dlc": false,
+   "mii": false,
+   "hover_focus": "css.grid.younglink",
+   "placed_focus": "css.medal.younglink",
+   "slot": "set_parts_chr_s_24",
+   "rect": [
+    648.0,
+    792.0,
+    292.0,
+    374.0
+   ]
+  },
+  {
+   "tile": 25,
+   "ui_rows": [
+    26
+   ],
+   "name_ids": [
+    "ganon"
+   ],
+   "ui_chara_ids": [
+    "ui_chara_ganon"
+   ],
+   "word": "0xc1001a0ea4221dc6",
+   "alternate": "0xc1ffff0000000000",
+   "fighter_kind": "0x122af1b944",
+   "kind": 24,
+   "kind_rule": "main kind table index",
+   "label_key": "nam_chr1_00_ganon",
+   "name": "Ganondorf",
+   "disp_order": 25,
+   "dlc": false,
+   "mii": false,
+   "hover_focus": "css.grid.ganon",
+   "placed_focus": "css.medal.ganon",
+   "slot": "set_parts_chr_s_25",
+   "rect": [
+    792.0,
+    936.0,
+    292.0,
+    374.0
+   ]
+  },
+  {
+   "tile": 26,
+   "ui_rows": [
+    27
+   ],
+   "name_ids": [
+    "mewtwo"
+   ],
+   "ui_chara_ids": [
+    "ui_chara_mewtwo"
+   ],
+   "word": "0xc1001b0f8fd5aee6",
+   "alternate": "0xc1ffff0000000000",
+   "fighter_kind": "0x138ced9f4e",
+   "kind": 25,
+   "kind_rule": "main kind table index",
+   "label_key": "nam_chr1_00_mewtwo",
+   "name": "Mewtwo",
+   "disp_order": 26,
+   "dlc": false,
+   "mii": false,
+   "hover_focus": "css.grid.mewtwo",
+   "placed_focus": "css.medal.mewtwo",
+   "slot": "set_parts_chr_s_26",
+   "rect": [
+    -936.0,
+    -792.0,
+    210.0,
+    292.0
+   ]
+  },
+  {
+   "tile": 27,
+   "ui_rows": [
+    28
+   ],
+   "name_ids": [
+    "roy"
+   ],
+   "ui_chara_ids": [
+    "ui_chara_roy"
+   ],
+   "word": "0xc1001c0c0284ebc0",
+   "alternate": "0xc1ffff0000000000",
+   "fighter_kind": "0x10941b9dd5",
+   "kind": 26,
+   "kind_rule": "main kind table index",
+   "label_key": "nam_chr1_00_roy",
+   "name": "Roy",
+   "disp_order": 27,
+   "dlc": false,
+   "mii": false,
+   "hover_focus": "css.grid.roy",
+   "placed_focus": "css.medal.roy",
+   "slot": "set_parts_chr_s_27",
+   "rect": [
+    -792.0,
+    -648.0,
+    210.0,
+    292.0
+   ]
+  },
+  {
+   "tile": 28,
+   "ui_rows": [
+    29
+   ],
+   "name_ids": [
+    "chrom"
+   ],
+   "ui_chara_ids": [
+    "ui_chara_chrom"
+   ],
+   "word": "0xc1001d0ea09fff22",
+   "alternate": "0xc1ffff0000000000",
+   "fighter_kind": "0x122e4c5ba0",
+   "kind": 27,
+   "kind_rule": "main kind table index",
+   "label_key": "nam_chr1_00_chrom",
+   "name": "Chrom",
+   "disp_order": 28,
+   "dlc": false,
+   "mii": false,
+   "hover_focus": "css.grid.chrom",
+   "placed_focus": "css.medal.chrom",
+   "slot": "set_parts_chr_s_28",
+   "rect": [
+    -648.0,
+    -504.0,
+    210.0,
+    292.0
+   ]
+  },
+  {
+   "tile": 29,
+   "ui_rows": [
+    30
+   ],
+   "name_ids": [
+    "gamewatch"
+   ],
+   "ui_chara_ids": [
+    "ui_chara_gamewatch"
+   ],
+   "word": "0xc1001e1230cd32d8",
+   "alternate": "0xc1ffff0000000000",
+   "fighter_kind": "0x1609f9812f",
+   "kind": 28,
+   "kind_rule": "main kind table index",
+   "label_key": "nam_chr1_00_gamewatch",
+   "name": "Mr. Game & Watch",
+   "disp_order": 29,
+   "dlc": false,
+   "mii": false,
+   "hover_focus": "css.grid.gamewatch",
+   "placed_focus": "css.medal.gamewatch",
+   "slot": "set_parts_chr_s_29",
+   "rect": [
+    -504.0,
+    -360.0,
+    210.0,
+    292.0
+   ]
+  },
+  {
+   "tile": 30,
+   "ui_rows": [
+    31
+   ],
+   "name_ids": [
+    "metaknight"
+   ],
+   "ui_chara_ids": [
+    "ui_chara_metaknight"
+   ],
+   "word": "0xc1001f1383197005",
+   "alternate": "0xc1ffff0000000000",
+   "fighter_kind": "0x17a0f92309",
+   "kind": 29,
+   "kind_rule": "main kind table index",
+   "label_key": "nam_chr1_00_metaknight",
+   "name": "Meta Knight",
+   "disp_order": 30,
+   "dlc": false,
+   "mii": false,
+   "hover_focus": "css.grid.metaknight",
+   "placed_focus": "css.medal.metaknight",
+   "slot": "set_parts_chr_s_30",
+   "rect": [
+    -360.0,
+    -216.0,
+    210.0,
+    292.0
+   ]
+  },
+  {
+   "tile": 31,
+   "ui_rows": [
+    32
+   ],
+   "name_ids": [
+    "pit"
+   ],
+   "ui_chara_ids": [
+    "ui_chara_pit"
+   ],
+   "word": "0xc100200c29ebe495",
+   "alternate": "0xc1ffff0000000000",
+   "fighter_kind": "0x10bf749280",
+   "kind": 30,
+   "kind_rule": "main kind table index",
+   "label_key": "nam_chr1_00_pit",
+   "name": "Pit",
+   "disp_order": 31,
+   "dlc": false,
+   "mii": false,
+   "hover_focus": "css.grid.pit",
+   "placed_focus": "css.medal.pit",
+   "slot": "set_parts_chr_s_31",
+   "rect": [
+    -216.0,
+    -72.0,
+    210.0,
+    292.0
+   ]
+  },
+  {
+   "tile": 32,
+   "ui_rows": [
+    33
+   ],
+   "name_ids": [
+    "pitb"
+   ],
+   "ui_chara_ids": [
+    "ui_chara_pitb"
+   ],
+   "word": "0xc100210df1f263d6",
+   "alternate": "0xc1ffff0000000000",
+   "fighter_kind": "0x119cb9184b",
+   "kind": 31,
+   "kind_rule": "main kind table index",
+   "label_key": "nam_chr1_00_pitb",
+   "name": "Dark Pit",
+   "disp_order": 32,
+   "dlc": false,
+   "mii": false,
+   "hover_focus": "css.grid.pitb",
+   "placed_focus": "css.medal.pitb",
+   "slot": "set_parts_chr_s_32",
+   "rect": [
+    -72.0,
+    72.0,
+    210.0,
+    292.0
+   ]
+  },
+  {
+   "tile": 33,
+   "ui_rows": [
+    34
+   ],
+   "name_ids": [
+    "szerosuit"
+   ],
+   "ui_chara_ids": [
+    "ui_chara_szerosuit"
+   ],
+   "word": "0xc100221288a0ed39",
+   "alternate": "0xc1ffff0000000000",
+   "fighter_kind": "0x16b1945ece",
+   "kind": 32,
+   "kind_rule": "main kind table index",
+   "label_key": "nam_chr1_00_szerosuit",
+   "name": "Zero Suit Samus",
+   "disp_order": 33,
+   "dlc": false,
+   "mii": false,
+   "hover_focus": "css.grid.szerosuit",
+   "placed_focus": "css.medal.szerosuit",
+   "slot": "set_parts_chr_s_33",
+   "rect": [
+    72.0,
+    216.0,
+    210.0,
+    292.0
+   ]
+  },
+  {
+   "tile": 34,
+   "ui_rows": [
+    35
+   ],
+   "name_ids": [
+    "wario"
+   ],
+   "ui_chara_ids": [
+    "ui_chara_wario"
+   ],
+   "word": "0xc100230ef0a34740",
+   "alternate": "0xc1ffff0000000000",
+   "fighter_kind": "0x127e70e3c2",
+   "kind": 33,
+   "kind_rule": "main kind table index",
+   "label_key": "nam_chr1_00_wario",
+   "name": "Wario",
+   "disp_order": 34,
+   "dlc": false,
+   "mii": false,
+   "hover_focus": "css.grid.wario",
+   "placed_focus": "css.medal.wario",
+   "slot": "set_parts_chr_s_34",
+   "rect": [
+    216.0,
+    360.0,
+    210.0,
+    292.0
+   ]
+  },
+  {
+   "tile": 35,
+   "ui_rows": [
+    36
+   ],
+   "name_ids": [
+    "snake"
+   ],
+   "ui_chara_ids": [
+    "ui_chara_snake"
+   ],
+   "word": "0xc100240e91c36763",
+   "alternate": "0xc1ffff0000000000",
+   "fighter_kind": "0x121f10c3e1",
+   "kind": 34,
+   "kind_rule": "main kind table index",
+   "label_key": "nam_chr1_00_snake",
+   "name": "Snake",
+   "disp_order": 35,
+   "dlc": false,
+   "mii": false,
+   "hover_focus": "css.grid.snake",
+   "placed_focus": "css.medal.snake",
+   "slot": "set_parts_chr_s_35",
+   "rect": [
+    360.0,
+    504.0,
+    210.0,
+    292.0
+   ]
+  },
+  {
+   "tile": 36,
+   "ui_rows": [
+    37
+   ],
+   "name_ids": [
+    "ike"
+   ],
+   "ui_chara_ids": [
+    "ui_chara_ike"
+   ],
+   "word": "0xc100250c629a3e1a",
+   "alternate": "0xc1ffff0000000000",
+   "fighter_kind": "0x10f405480f",
+   "kind": 35,
+   "kind_rule": "main kind table index",
+   "label_key": "nam_chr1_00_ike",
+   "name": "Ike",
+   "disp_order": 36,
+   "dlc": false,
+   "mii": false,
+   "hover_focus": "css.grid.ike",
+   "placed_focus": "css.medal.ike",
+   "slot": "set_parts_chr_s_36",
+   "rect": [
+    504.0,
+    648.0,
+    210.0,
+    292.0
+   ]
+  },
+  {
+   "tile": 37,
+   "ui_rows": [
+    38
+   ],
+   "name_ids": [
+    "ptrainer"
+   ],
+   "ui_chara_ids": [
+    "ui_chara_ptrainer"
+   ],
+   "word": "0xc1002611b1ccb807",
+   "alternate": "0xc1ffff0000000000",
+   "fighter_kind": "0x0000000000",
+   "kind": null,
+   "kind_rule": "none: ui_chara has no fighter_kind",
+   "label_key": "nam_chr1_00_ptrainer",
+   "name": "Pokémon Trainer",
+   "disp_order": 37,
+   "dlc": false,
+   "mii": false,
+   "hover_focus": "css.grid.ptrainer",
+   "placed_focus": "css.medal.ptrainer",
+   "slot": "set_parts_chr_s_37",
+   "rect": [
+    648.0,
+    792.0,
+    210.0,
+    292.0
+   ]
+  },
+  {
+   "tile": 38,
+   "ui_rows": [
+    42
+   ],
+   "name_ids": [
+    "diddy"
+   ],
+   "ui_chara_ids": [
+    "ui_chara_diddy"
+   ],
+   "word": "0xc1002a0e4b869623",
+   "alternate": "0xc1ffff0000000000",
+   "fighter_kind": "0x12c55532a1",
+   "kind": 39,
+   "kind_rule": "main kind table index",
+   "label_key": "nam_chr1_00_diddy",
+   "name": "Diddy Kong",
+   "disp_order": 38,
+   "dlc": false,
+   "mii": false,
+   "hover_focus": "css.grid.diddy",
+   "placed_focus": "css.medal.diddy",
+   "slot": "set_parts_chr_s_38",
+   "rect": [
+    792.0,
+    936.0,
+    210.0,
+    292.0
+   ]
+  },
+  {
+   "tile": 39,
+   "ui_rows": [
+    43
+   ],
+   "name_ids": [
+    "lucas"
+   ],
+   "ui_chara_ids": [
+    "ui_chara_lucas"
+   ],
+   "word": "0xc1002b0ef9d43e1b",
+   "alternate": "0xc1ffff0000000000",
+   "fighter_kind": "0x1277079a99",
+   "kind": 40,
+   "kind_rule": "main kind table index",
+   "label_key": "nam_chr1_00_lucas",
+   "name": "Lucas",
+   "disp_order": 39,
+   "dlc": false,
+   "mii": false,
+   "hover_focus": "css.grid.lucas",
+   "placed_focus": "css.medal.lucas",
+   "slot": "set_parts_chr_s_39",
+   "rect": [
+    -936.0,
+    -792.0,
+    128.0,
+    210.0
+   ]
+  },
+  {
+   "tile": 40,
+   "ui_rows": [
+    44
+   ],
+   "name_ids": [
+    "sonic"
+   ],
+   "ui_chara_ids": [
+    "ui_chara_sonic"
+   ],
+   "word": "0xc1002c0ef976808c",
+   "alternate": "0xc1ffff0000000000",
+   "fighter_kind": "0x1277a5240e",
+   "kind": 41,
+   "kind_rule": "main kind table index",
+   "label_key": "nam_chr1_00_sonic",
+   "name": "Sonic",
+   "disp_order": 40,
+   "dlc": false,
+   "mii": false,
+   "hover_focus": "css.grid.sonic",
+   "placed_focus": "css.medal.sonic",
+   "slot": "set_parts_chr_s_40",
+   "rect": [
+    -792.0,
+    -648.0,
+    128.0,
+    210.0
+   ]
+  },
+  {
+   "tile": 41,
+   "ui_rows": [
+    45
+   ],
+   "name_ids": [
+    "dedede"
+   ],
+   "ui_chara_ids": [
+    "ui_chara_dedede"
+   ],
+   "word": "0xc1002d0f76a86694",
+   "alternate": "0xc1ffff0000000000",
+   "fighter_kind": "0x137590573c",
+   "kind": 42,
+   "kind_rule": "main kind table index",
+   "label_key": "nam_chr1_00_dedede",
+   "name": "King Dedede",
+   "disp_order": 41,
+   "dlc": false,
+   "mii": false,
+   "hover_focus": "css.grid.dedede",
+   "placed_focus": "css.medal.dedede",
+   "slot": "set_parts_chr_s_41",
+   "rect": [
+    -648.0,
+    -504.0,
+    128.0,
+    210.0
+   ]
+  },
+  {
+   "tile": 42,
+   "ui_rows": [
+    46
+   ],
+   "name_ids": [
+    "pikmin"
+   ],
+   "ui_chara_ids": [
+    "ui_chara_pikmin"
+   ],
+   "word": "0xc1002e0f5f132d33",
+   "alternate": "0xc1ffff0000000000",
+   "fighter_kind": "0x135c2b1c9b",
+   "kind": 43,
+   "kind_rule": "main kind table index",
+   "label_key": "nam_chr1_00_pikmin",
+   "name": "Olimar",
+   "disp_order": 42,
+   "dlc": false,
+   "mii": false,
+   "hover_focus": "css.grid.pikmin",
+   "placed_focus": "css.medal.pikmin",
+   "slot": "set_parts_chr_s_42",
+   "rect": [
+    -504.0,
+    -360.0,
+    128.0,
+    210.0
+   ]
+  },
+  {
+   "tile": 43,
+   "ui_rows": [
+    47
+   ],
+   "name_ids": [
+    "lucario"
+   ],
+   "ui_chara_ids": [
+    "ui_chara_lucario"
+   ],
+   "word": "0xc1002f10417efb0a",
+   "alternate": "0xc1ffff0000000000",
+   "fighter_kind": "0x149970e8e1",
+   "kind": 44,
+   "kind_rule": "main kind table index",
+   "label_key": "nam_chr1_00_lucario",
+   "name": "Lucario",
+   "disp_order": 43,
+   "dlc": false,
+   "mii": false,
+   "hover_focus": "css.grid.lucario",
+   "placed_focus": "css.medal.lucario",
+   "slot": "set_parts_chr_s_43",
+   "rect": [
+    -360.0,
+    -216.0,
+    128.0,
+    210.0
+   ]
+  },
+  {
+   "tile": 44,
+   "ui_rows": [
+    48
+   ],
+   "name_ids": [
+    "robot"
+   ],
+   "ui_chara_ids": [
+    "ui_chara_robot"
+   ],
+   "word": "0xc100300e18857219",
+   "alternate": "0xc1ffff0000000000",
+   "fighter_kind": "0x129656d69b",
+   "kind": 45,
+   "kind_rule": "main kind table index",
+   "label_key": "nam_chr1_00_robot",
+   "name": "R.O.B.",
+   "disp_order": 44,
+   "dlc": false,
+   "mii": false,
+   "hover_focus": "css.grid.robot",
+   "placed_focus": "css.medal.robot",
+   "slot": "set_parts_chr_s_44",
+   "rect": [
+    -216.0,
+    -72.0,
+    128.0,
+    210.0
+   ]
+  },
+  {
+   "tile": 45,
+   "ui_rows": [
+    49
+   ],
+   "name_ids": [
+    "toonlink"
+   ],
+   "ui_chara_ids": [
+    "ui_chara_toonlink"
+   ],
+   "word": "0xc1003111d8496fe1",
+   "alternate": "0xc1ffff0000000000",
+   "fighter_kind": "0x15ef495a02",
+   "kind": 46,
+   "kind_rule": "main kind table index",
+   "label_key": "nam_chr1_00_toonlink",
+   "name": "Toon Link",
+   "disp_order": 45,
+   "dlc": false,
+   "mii": false,
+   "hover_focus": "css.grid.toonlink",
+   "placed_focus": "css.medal.toonlink",
+   "slot": "set_parts_chr_s_45",
+   "rect": [
+    -72.0,
+    72.0,
+    128.0,
+    210.0
+   ]
+  },
+  {
+   "tile": 46,
+   "ui_rows": [
+    50
+   ],
+   "name_ids": [
+    "wolf"
+   ],
+   "ui_chara_ids": [
+    "ui_chara_wolf"
+   ],
+   "word": "0xc100320dedde7b9d",
+   "alternate": "0xc1ffff0000000000",
+   "fighter_kind": "0x1180950000",
+   "kind": 47,
+   "kind_rule": "main kind table index",
+   "label_key": "nam_chr1_00_wolf",
+   "name": "Wolf",
+   "disp_order": 46,
+   "dlc": false,
+   "mii": false,
+   "hover_focus": "css.grid.wolf",
+   "placed_focus": "css.medal.wolf",
+   "slot": "set_parts_chr_s_46",
+   "rect": [
+    72.0,
+    216.0,
+    128.0,
+    210.0
+   ]
+  },
+  {
+   "tile": 47,
+   "ui_rows": [
+    51
+   ],
+   "name_ids": [
+    "murabito"
+   ],
+   "ui_chara_ids": [
+    "ui_chara_murabito"
+   ],
+   "word": "0xc100331112944904",
+   "alternate": "0xc1ffff0000000000",
+   "fighter_kind": "0x1525947ce7",
+   "kind": 48,
+   "kind_rule": "main kind table index",
+   "label_key": "nam_chr1_00_murabito",
+   "name": "Villager",
+   "disp_order": 47,
+   "dlc": false,
+   "mii": false,
+   "hover_focus": "css.grid.murabito",
+   "placed_focus": "css.medal.murabito",
+   "slot": "set_parts_chr_s_47",
+   "rect": [
+    216.0,
+    360.0,
+    128.0,
+    210.0
+   ]
+  },
+  {
+   "tile": 48,
+   "ui_rows": [
+    52
+   ],
+   "name_ids": [
+    "rockman"
+   ],
+   "ui_chara_ids": [
+    "ui_chara_rockman"
+   ],
+   "word": "0xc100341013cb83d3",
+   "alternate": "0xc1ffff0000000000",
+   "fighter_kind": "0x14cbc59038",
+   "kind": 49,
+   "kind_rule": "main kind table index",
+   "label_key": "nam_chr1_00_rockman",
+   "name": "Mega Man",
+   "disp_order": 48,
+   "dlc": false,
+   "mii": false,
+   "hover_focus": "css.grid.rockman",
+   "placed_focus": "css.medal.rockman",
+   "slot": "set_parts_chr_s_48",
+   "rect": [
+    360.0,
+    504.0,
+    128.0,
+    210.0
+   ]
+  },
+  {
+   "tile": 49,
+   "ui_rows": [
+    53
+   ],
+   "name_ids": [
+    "wiifit"
+   ],
+   "ui_chara_ids": [
+    "ui_chara_wiifit"
+   ],
+   "word": "0xc100350f1928c39b",
+   "alternate": "0xc1ffff0000000000",
+   "fighter_kind": "0x131a10f233",
+   "kind": 50,
+   "kind_rule": "main kind table index",
+   "label_key": "nam_chr1_00_wiifit",
+   "name": "Wii Fit Trainer",
+   "disp_order": 49,
+   "dlc": false,
+   "mii": false,
+   "hover_focus": "css.grid.wiifit",
+   "placed_focus": "css.medal.wiifit",
+   "slot": "set_parts_chr_s_49",
+   "rect": [
+    504.0,
+    648.0,
+    128.0,
+    210.0
+   ]
+  },
+  {
+   "tile": 50,
+   "ui_rows": [
+    54
+   ],
+   "name_ids": [
+    "rosetta"
+   ],
+   "ui_chara_ids": [
+    "ui_chara_rosetta"
+   ],
+   "word": "0xc100361027090018",
+   "alternate": "0xc1ffff0000000000",
+   "fighter_kind": "0x14ff0713f3",
+   "kind": 51,
+   "kind_rule": "main kind table index",
+   "label_key": "nam_chr1_00_rosetta",
+   "name": "Rosalina & Luma",
+   "disp_order": 50,
+   "dlc": false,
+   "mii": false,
+   "hover_focus": "css.grid.rosetta",
+   "placed_focus": "css.medal.rosetta",
+   "slot": "set_parts_chr_s_50",
+   "rect": [
+    648.0,
+    792.0,
+    128.0,
+    210.0
+   ]
+  },
+  {
+   "tile": 51,
+   "ui_rows": [
+    55
+   ],
+   "name_ids": [
+    "littlemac"
+   ],
+   "ui_chara_ids": [
+    "ui_chara_littlemac"
+   ],
+   "word": "0xc100371275f0ada2",
+   "alternate": "0xc1ffff0000000000",
+   "fighter_kind": "0x164cc41e55",
+   "kind": 52,
+   "kind_rule": "main kind table index",
+   "label_key": "nam_chr1_00_littlemac",
+   "name": "Little Mac",
+   "disp_order": 51,
+   "dlc": false,
+   "mii": false,
+   "hover_focus": "css.grid.littlemac",
+   "placed_focus": "css.medal.littlemac",
+   "slot": "set_parts_chr_s_51",
+   "rect": [
+    792.0,
+    936.0,
+    128.0,
+    210.0
+   ]
+  },
+  {
+   "tile": 52,
+   "ui_rows": [
+    56
+   ],
+   "name_ids": [
+    "gekkouga"
+   ],
+   "ui_chara_ids": [
+    "ui_chara_gekkouga"
+   ],
+   "word": "0xc1003811ebe26cac",
+   "alternate": "0xc1ffff0000000000",
+   "fighter_kind": "0x15dce2594f",
+   "kind": 53,
+   "kind_rule": "main kind table index",
+   "label_key": "nam_chr1_00_gekkouga",
+   "name": "Greninja",
+   "disp_order": 52,
+   "dlc": false,
+   "mii": false,
+   "hover_focus": "css.grid.gekkouga",
+   "placed_focus": "css.medal.gekkouga",
+   "slot": "set_parts_chr_s_52",
+   "rect": [
+    -936.0,
+    -792.0,
+    46.0,
+    128.0
+   ]
+  },
+  {
+   "tile": 53,
+   "ui_rows": [
+    57
+   ],
+   "name_ids": [
+    "palutena"
+   ],
+   "ui_chara_ids": [
+    "ui_chara_palutena"
+   ],
+   "word": "0xc1003911e1faa171",
+   "alternate": "0xc1ffff0000000000",
+   "fighter_kind": "0x15d6fa9492",
+   "kind": 54,
+   "kind_rule": "main kind table index",
+   "label_key": "nam_chr1_00_palutena",
+   "name": "Palutena",
+   "disp_order": 53,
+   "dlc": false,
+   "mii": false,
+   "hover_focus": "css.grid.palutena",
+   "placed_focus": "css.medal.palutena",
+   "slot": "set_parts_chr_s_53",
+   "rect": [
+    -792.0,
+    -648.0,
+    46.0,
+    128.0
+   ]
+  },
+  {
+   "tile": 54,
+   "ui_rows": [
+    58
+   ],
+   "name_ids": [
+    "pacman"
+   ],
+   "ui_chara_ids": [
+    "ui_chara_pacman"
+   ],
+   "word": "0xc1003a0f620ec415",
+   "alternate": "0xc1ffff0000000000",
+   "fighter_kind": "0x136136f5bd",
+   "kind": 55,
+   "kind_rule": "main kind table index",
+   "label_key": "nam_chr1_00_pacman",
+   "name": "PAC-MAN",
+   "disp_order": 54,
+   "dlc": false,
+   "mii": false,
+   "hover_focus": "css.grid.pacman",
+   "placed_focus": "css.medal.pacman",
+   "slot": "set_parts_chr_s_54",
+   "rect": [
+    -648.0,
+    -504.0,
+    46.0,
+    128.0
+   ]
+  },
+  {
+   "tile": 55,
+   "ui_rows": [
+    59
+   ],
+   "name_ids": [
+    "reflet"
+   ],
+   "ui_chara_ids": [
+    "ui_chara_reflet"
+   ],
+   "word": "0xc1003b0f755465a5",
+   "alternate": "0xc1ffff0000000000",
+   "fighter_kind": "0x13766c540d",
+   "kind": 56,
+   "kind_rule": "main kind table index",
+   "label_key": "nam_chr1_00_reflet",
+   "name": "Robin",
+   "disp_order": 55,
+   "dlc": false,
+   "mii": false,
+   "hover_focus": "css.grid.reflet",
+   "placed_focus": "css.medal.reflet",
+   "slot": "set_parts_chr_s_55",
+   "rect": [
+    -504.0,
+    -360.0,
+    46.0,
+    128.0
+   ]
+  },
+  {
+   "tile": 56,
+   "ui_rows": [
+    60
+   ],
+   "name_ids": [
+    "shulk"
+   ],
+   "ui_chara_ids": [
+    "ui_chara_shulk"
+   ],
+   "word": "0xc1003c0e077e88d3",
+   "alternate": "0xc1ffff0000000000",
+   "fighter_kind": "0x1289ad2c51",
+   "kind": 57,
+   "kind_rule": "main kind table index",
+   "label_key": "nam_chr1_00_shulk",
+   "name": "Shulk",
+   "disp_order": 56,
+   "dlc": false,
+   "mii": false,
+   "hover_focus": "css.grid.shulk",
+   "placed_focus": "css.medal.shulk",
+   "slot": "set_parts_chr_s_56",
+   "rect": [
+    -360.0,
+    -216.0,
+    46.0,
+    128.0
+   ]
+  },
+  {
+   "tile": 57,
+   "ui_rows": [
+    61
+   ],
+   "name_ids": [
+    "koopajr"
+   ],
+   "ui_chara_ids": [
+    "ui_chara_koopajr"
+   ],
+   "word": "0xc1003d105d8a1bb1",
+   "alternate": "0xc1ffff0000000000",
+   "fighter_kind": "0x148584085a",
+   "kind": 58,
+   "kind_rule": "main kind table index",
+   "label_key": "nam_chr1_00_koopajr",
+   "name": "Bowser Jr.",
+   "disp_order": 57,
+   "dlc": false,
+   "mii": false,
+   "hover_focus": "css.grid.koopajr",
+   "placed_focus": "css.medal.koopajr",
+   "slot": "set_parts_chr_s_57",
+   "rect": [
+    -216.0,
+    -72.0,
+    46.0,
+    128.0
+   ]
+  },
+  {
+   "tile": 58,
+   "ui_rows": [
+    62
+   ],
+   "name_ids": [
+    "duckhunt"
+   ],
+   "ui_chara_ids": [
+    "ui_chara_duckhunt"
+   ],
+   "word": "0xc1003e11cf2812f7",
+   "alternate": "0xc1ffff0000000000",
+   "fighter_kind": "0x15f8282714",
+   "kind": 59,
+   "kind_rule": "main kind table index",
+   "label_key": "nam_chr1_00_duckhunt",
+   "name": "Duck Hunt",
+   "disp_order": 58,
+   "dlc": false,
+   "mii": false,
+   "hover_focus": "css.grid.duckhunt",
+   "placed_focus": "css.medal.duckhunt",
+   "slot": "set_parts_chr_s_58",
+   "rect": [
+    -72.0,
+    72.0,
+    46.0,
+    128.0
+   ]
+  },
+  {
+   "tile": 59,
+   "ui_rows": [
+    63
+   ],
+   "name_ids": [
+    "ryu"
+   ],
+   "ui_chara_ids": [
+    "ui_chara_ryu"
+   ],
+   "word": "0xc1003f0c17aa123c",
+   "alternate": "0xc1ffff0000000000",
+   "fighter_kind": "0x1081356429",
+   "kind": 60,
+   "kind_rule": "main kind table index",
+   "label_key": "nam_chr1_00_ryu",
+   "name": "Ryu",
+   "disp_order": 59,
+   "dlc": false,
+   "mii": false,
+   "hover_focus": "css.grid.ryu",
+   "placed_focus": "css.medal.ryu",
+   "slot": "set_parts_chr_s_59",
+   "rect": [
+    72.0,
+    216.0,
+    46.0,
+    128.0
+   ]
+  },
+  {
+   "tile": 60,
+   "ui_rows": [
+    64
+   ],
+   "name_ids": [
+    "ken"
+   ],
+   "ui_chara_ids": [
+    "ui_chara_ken"
+   ],
+   "word": "0xc100400c684f1e72",
+   "alternate": "0xc1ffff0000000000",
+   "fighter_kind": "0x10fed06867",
+   "kind": 61,
+   "kind_rule": "main kind table index",
+   "label_key": "nam_chr1_00_ken",
+   "name": "Ken",
+   "disp_order": 60,
+   "dlc": false,
+   "mii": false,
+   "hover_focus": "css.grid.ken",
+   "placed_focus": "css.medal.ken",
+   "slot": "set_parts_chr_s_60",
+   "rect": [
+    216.0,
+    360.0,
+    46.0,
+    128.0
+   ]
+  },
+  {
+   "tile": 61,
+   "ui_rows": [
+    65
+   ],
+   "name_ids": [
+    "cloud"
+   ],
+   "ui_chara_ids": [
+    "ui_chara_cloud"
+   ],
+   "word": "0xc100410ef2f21a29",
+   "alternate": "0xc1ffff0000000000",
+   "fighter_kind": "0x127c21beab",
+   "kind": 62,
+   "kind_rule": "main kind table index",
+   "label_key": "nam_chr1_00_cloud",
+   "name": "Cloud",
+   "disp_order": 61,
+   "dlc": false,
+   "mii": false,
+   "hover_focus": "css.grid.cloud",
+   "placed_focus": "css.medal.cloud",
+   "slot": "set_parts_chr_s_61",
+   "rect": [
+    360.0,
+    504.0,
+    46.0,
+    128.0
+   ]
+  },
+  {
+   "tile": 62,
+   "ui_rows": [
+    66
+   ],
+   "name_ids": [
+    "kamui"
+   ],
+   "ui_chara_ids": [
+    "ui_chara_kamui"
+   ],
+   "word": "0xc100420e4ddd21e6",
+   "alternate": "0xc1ffff0000000000",
+   "fighter_kind": "0x12c30e8564",
+   "kind": 63,
+   "kind_rule": "main kind table index",
+   "label_key": "nam_chr1_00_kamui",
+   "name": "Corrin",
+   "disp_order": 62,
+   "dlc": false,
+   "mii": false,
+   "hover_focus": "css.grid.kamui",
+   "placed_focus": "css.medal.kamui",
+   "slot": "set_parts_chr_s_62",
+   "rect": [
+    504.0,
+    648.0,
+    46.0,
+    128.0
+   ]
+  },
+  {
+   "tile": 63,
+   "ui_rows": [
+    67
+   ],
+   "name_ids": [
+    "bayonetta"
+   ],
+   "ui_chara_ids": [
+    "ui_chara_bayonetta"
+   ],
+   "word": "0xc1004312d69db2ba",
+   "alternate": "0xc1ffff0000000000",
+   "fighter_kind": "0x16efa9014d",
+   "kind": 64,
+   "kind_rule": "main kind table index",
+   "label_key": "nam_chr1_00_bayonetta",
+   "name": "Bayonetta",
+   "disp_order": 63,
+   "dlc": false,
+   "mii": false,
+   "hover_focus": "css.grid.bayonetta",
+   "placed_focus": "css.medal.bayonetta",
+   "slot": "set_parts_chr_s_63",
+   "rect": [
+    648.0,
+    792.0,
+    46.0,
+    128.0
+   ]
+  },
+  {
+   "tile": 64,
+   "ui_rows": [
+    69
+   ],
+   "name_ids": [
+    "inkling"
+   ],
+   "ui_chara_ids": [
+    "ui_chara_inkling"
+   ],
+   "word": "0xc1004510e9a4e78d",
+   "alternate": "0xc1ffff0000000000",
+   "fighter_kind": "0x1431aaf466",
+   "kind": 65,
+   "kind_rule": "main kind table index",
+   "label_key": "nam_chr1_00_inkling",
+   "name": "Inkling",
+   "disp_order": 64,
+   "dlc": false,
+   "mii": false,
+   "hover_focus": "css.grid.inkling",
+   "placed_focus": "css.medal.inkling",
+   "slot": "set_parts_chr_s_64",
+   "rect": [
+    792.0,
+    936.0,
+    46.0,
+    128.0
+   ]
+  },
+  {
+   "tile": 65,
+   "ui_rows": [
+    70
+   ],
+   "name_ids": [
+    "ridley"
+   ],
+   "ui_chara_ids": [
+    "ui_chara_ridley"
+   ],
+   "word": "0xc100460f641c3c92",
+   "alternate": "0xc1ffff0000000000",
+   "fighter_kind": "0x1367240d3a",
+   "kind": 66,
+   "kind_rule": "main kind table index",
+   "label_key": "nam_chr1_00_ridley",
+   "name": "Ridley",
+   "disp_order": 65,
+   "dlc": false,
+   "mii": false,
+   "hover_focus": "css.grid.ridley",
+   "placed_focus": "css.medal.ridley",
+   "slot": "set_parts_chr_s_65",
+   "rect": [
+    -936.0,
+    -792.0,
+    -36.0,
+    46.0
+   ]
+  },
+  {
+   "tile": 66,
+   "ui_rows": [
+    72
+   ],
+   "name_ids": [
+    "simon"
+   ],
+   "ui_chara_ids": [
+    "ui_chara_simon"
+   ],
+   "word": "0xc100480ef6b0ba32",
+   "alternate": "0xc1ffff0000000000",
+   "fighter_kind": "0x1278631eb0",
+   "kind": 67,
+   "kind_rule": "main kind table index",
+   "label_key": "nam_chr1_00_simon",
+   "name": "Simon",
+   "disp_order": 66,
+   "dlc": false,
+   "mii": false,
+   "hover_focus": "css.grid.simon",
+   "placed_focus": "css.medal.simon",
+   "slot": "set_parts_chr_s_66",
+   "rect": [
+    -792.0,
+    -648.0,
+    -36.0,
+    46.0
+   ]
+  },
+  {
+   "tile": 67,
+   "ui_rows": [
+    68
+   ],
+   "name_ids": [
+    "richter"
+   ],
+   "ui_chara_ids": [
+    "ui_chara_richter"
+   ],
+   "word": "0xc1004410b4bdce94",
+   "alternate": "0xc1ffff0000000000",
+   "fighter_kind": "0x146cb3dd7f",
+   "kind": 68,
+   "kind_rule": "main kind table index",
+   "label_key": "nam_chr1_00_richter",
+   "name": "Richter",
+   "disp_order": 67,
+   "dlc": false,
+   "mii": false,
+   "hover_focus": "css.grid.richter",
+   "placed_focus": "css.medal.richter",
+   "slot": "set_parts_chr_s_67",
+   "rect": [
+    -648.0,
+    -504.0,
+    -36.0,
+    46.0
+   ]
+  },
+  {
+   "tile": 68,
+   "ui_rows": [
+    71
+   ],
+   "name_ids": [
+    "krool"
+   ],
+   "ui_chara_ids": [
+    "ui_chara_krool"
+   ],
+   "word": "0xc100470eccb203ad",
+   "alternate": "0xc1ffff0000000000",
+   "fighter_kind": "0x124261a72f",
+   "kind": 69,
+   "kind_rule": "main kind table index",
+   "label_key": "nam_chr1_00_krool",
+   "name": "King K. Rool",
+   "disp_order": 68,
+   "dlc": false,
+   "mii": false,
+   "hover_focus": "css.grid.krool",
+   "placed_focus": "css.medal.krool",
+   "slot": "set_parts_chr_s_68",
+   "rect": [
+    -504.0,
+    -360.0,
+    -36.0,
+    46.0
+   ]
+  },
+  {
+   "tile": 69,
+   "ui_rows": [
+    73
+   ],
+   "name_ids": [
+    "shizue"
+   ],
+   "ui_chara_ids": [
+    "ui_chara_shizue"
+   ],
+   "word": "0xc100490f26228f86",
+   "alternate": "0xc1ffff0000000000",
+   "fighter_kind": "0x13251abe2e",
+   "kind": 70,
+   "kind_rule": "main kind table index",
+   "label_key": "nam_chr1_00_shizue",
+   "name": "Isabelle",
+   "disp_order": 69,
+   "dlc": false,
+   "mii": false,
+   "hover_focus": "css.grid.shizue",
+   "placed_focus": "css.medal.shizue",
+   "slot": "set_parts_chr_s_69",
+   "rect": [
+    -360.0,
+    -216.0,
+    -36.0,
+    46.0
+   ]
+  },
+  {
+   "tile": 70,
+   "ui_rows": [
+    74
+   ],
+   "name_ids": [
+    "gaogaen"
+   ],
+   "ui_chara_ids": [
+    "ui_chara_gaogaen"
+   ],
+   "word": "0xc1004a10fe773f13",
+   "alternate": "0xc1ffff0000000000",
+   "fighter_kind": "0x1426792cf8",
+   "kind": 71,
+   "kind_rule": "main kind table index",
+   "label_key": "nam_chr1_00_gaogaen",
+   "name": "Incineroar",
+   "disp_order": 70,
+   "dlc": false,
+   "mii": false,
+   "hover_focus": "css.grid.gaogaen",
+   "placed_focus": "css.medal.gaogaen",
+   "slot": "set_parts_chr_s_70",
+   "rect": [
+    -216.0,
+    -72.0,
+    -36.0,
+    46.0
+   ]
+  },
+  {
+   "tile": 71,
+   "ui_rows": [
+    105
+   ],
+   "name_ids": [
+    "packun"
+   ],
+   "ui_chara_ids": [
+    "ui_chara_packun"
+   ],
+   "word": "0xc100690f482d6ff2",
+   "alternate": "0xc1ffff0000000000",
+   "fighter_kind": "0x134b155e5a",
+   "kind": 81,
+   "kind_rule": "main kind table index",
+   "label_key": "nam_chr1_00_packun",
+   "name": "Piranha Plant",
+   "disp_order": 71,
+   "dlc": true,
+   "mii": false,
+   "hover_focus": "css.grid.packun",
+   "placed_focus": "css.medal.packun",
+   "slot": "set_parts_chr_s_71",
+   "rect": [
+    -72.0,
+    72.0,
+    -36.0,
+    46.0
+   ]
+  },
+  {
+   "tile": 72,
+   "ui_rows": [
+    106
+   ],
+   "name_ids": [
+    "jack"
+   ],
+   "ui_chara_ids": [
+    "ui_chara_jack"
+   ],
+   "word": "0xc1006a0dbc1ab9a7",
+   "alternate": "0xc1ffff0000000000",
+   "fighter_kind": "0x11d151c23a",
+   "kind": 82,
+   "kind_rule": "main kind table index",
+   "label_key": "nam_chr1_00_jack",
+   "name": "Joker",
+   "disp_order": 72,
+   "dlc": true,
+   "mii": false,
+   "hover_focus": "css.grid.jack",
+   "placed_focus": "css.medal.jack",
+   "slot": "set_parts_chr_s_72",
+   "rect": [
+    72.0,
+    216.0,
+    -36.0,
+    46.0
+   ]
+  },
+  {
+   "tile": 73,
+   "ui_rows": [
+    107
+   ],
+   "name_ids": [
+    "brave"
+   ],
+   "ui_chara_ids": [
+    "ui_chara_brave"
+   ],
+   "word": "0xc1006b0e29e05d6a",
+   "alternate": "0xc1ffff0000000000",
+   "fighter_kind": "0x12a733f9e8",
+   "kind": 83,
+   "kind_rule": "main kind table index",
+   "label_key": "nam_chr1_00_brave",
+   "name": "Hero",
+   "disp_order": 73,
+   "dlc": true,
+   "mii": false,
+   "hover_focus": "css.grid.brave",
+   "placed_focus": "css.medal.brave",
+   "slot": "set_parts_chr_s_73",
+   "rect": [
+    216.0,
+    360.0,
+    -36.0,
+    46.0
+   ]
+  },
+  {
+   "tile": 74,
+   "ui_rows": [
+    108
+   ],
+   "name_ids": [
+    "buddy"
+   ],
+   "ui_chara_ids": [
+    "ui_chara_buddy"
+   ],
+   "word": "0xc1006c0ede098ba4",
+   "alternate": "0xc1ffff0000000000",
+   "fighter_kind": "0x1250da2f26",
+   "kind": 84,
+   "kind_rule": "main kind table index",
+   "label_key": "nam_chr1_00_buddy",
+   "name": "Banjo & Kazooie",
+   "disp_order": 74,
+   "dlc": true,
+   "mii": false,
+   "hover_focus": "css.grid.buddy",
+   "placed_focus": "css.medal.buddy",
+   "slot": "set_parts_chr_s_74",
+   "rect": [
+    360.0,
+    504.0,
+    -36.0,
+    46.0
+   ]
+  },
+  {
+   "tile": 75,
+   "ui_rows": [
+    109
+   ],
+   "name_ids": [
+    "dolly"
+   ],
+   "ui_chara_ids": [
+    "ui_chara_dolly"
+   ],
+   "word": "0xc1006d0ea827124f",
+   "alternate": "0xc1ffff0000000000",
+   "fighter_kind": "0x1226f4b6cd",
+   "kind": 85,
+   "kind_rule": "main kind table index",
+   "label_key": "nam_chr1_00_dolly",
+   "name": "Terry",
+   "disp_order": 75,
+   "dlc": true,
+   "mii": false,
+   "hover_focus": "css.grid.dolly",
+   "placed_focus": "css.medal.dolly",
+   "slot": "set_parts_chr_s_75",
+   "rect": [
+    504.0,
+    648.0,
+    -36.0,
+    46.0
+   ]
+  },
+  {
+   "tile": 76,
+   "ui_rows": [
+    110
+   ],
+   "name_ids": [
+    "master"
+   ],
+   "ui_chara_ids": [
+    "ui_chara_master"
+   ],
+   "word": "0xc1006e0feec5837b",
+   "alternate": "0xc1ffff0000000000",
+   "fighter_kind": "0x13edfdb2d3",
+   "kind": 86,
+   "kind_rule": "main kind table index",
+   "label_key": "nam_chr1_00_master",
+   "name": "Byleth",
+   "disp_order": 76,
+   "dlc": true,
+   "mii": false,
+   "hover_focus": "css.grid.master",
+   "placed_focus": "css.medal.master",
+   "slot": "set_parts_chr_s_76",
+   "rect": [
+    648.0,
+    792.0,
+    -36.0,
+    46.0
+   ]
+  },
+  {
+   "tile": 77,
+   "ui_rows": [
+    111
+   ],
+   "name_ids": [
+    "tantan"
+   ],
+   "ui_chara_ids": [
+    "ui_chara_tantan"
+   ],
+   "word": "0xc1006f0f1802c621",
+   "alternate": "0xc1ffff0000000000",
+   "fighter_kind": "0x131b3af789",
+   "kind": 87,
+   "kind_rule": "main kind table index",
+   "label_key": "nam_chr1_00_tantan",
+   "name": "Min Min",
+   "disp_order": 77,
+   "dlc": true,
+   "mii": false,
+   "hover_focus": "css.grid.tantan",
+   "placed_focus": "css.medal.tantan",
+   "slot": "set_parts_chr_s_77",
+   "rect": [
+    792.0,
+    936.0,
+    -36.0,
+    46.0
+   ]
+  },
+  {
+   "tile": 78,
+   "ui_rows": [
+    112
+   ],
+   "name_ids": [
+    "pickel"
+   ],
+   "ui_chara_ids": [
+    "ui_chara_pickel"
+   ],
+   "word": "0xc100700fdc91574e",
+   "alternate": "0xc1ffff0000000000",
+   "fighter_kind": "0x13dfa966e6",
+   "kind": 88,
+   "kind_rule": "main kind table index",
+   "label_key": "nam_chr1_00_pickel",
+   "name": "Steve",
+   "disp_order": 78,
+   "dlc": true,
+   "mii": false,
+   "hover_focus": "css.grid.pickel",
+   "placed_focus": "css.medal.pickel",
+   "slot": "set_parts_chr_s_80",
+   "rect": [
+    -648.0,
+    -504.0,
+    -118.0,
+    -36.0
+   ]
+  },
+  {
+   "tile": 79,
+   "ui_rows": [
+    113
+   ],
+   "name_ids": [
+    "edge"
+   ],
+   "ui_chara_ids": [
+    "ui_chara_edge"
+   ],
+   "word": "0xc100710d61668319",
+   "alternate": "0xc1ffff0000000000",
+   "fighter_kind": "0x110c2df884",
+   "kind": 89,
+   "kind_rule": "main kind table index",
+   "label_key": "nam_chr1_00_edge",
+   "name": "Sephiroth",
+   "disp_order": 79,
+   "dlc": true,
+   "mii": false,
+   "hover_focus": "css.grid.edge",
+   "placed_focus": "css.medal.edge",
+   "slot": "set_parts_chr_s_81",
+   "rect": [
+    -504.0,
+    -360.0,
+    -118.0,
+    -36.0
+   ]
+  },
+  {
+   "tile": 80,
+   "ui_rows": [
+    115,
+    116
+   ],
+   "name_ids": [
+    "eflame_first",
+    "elight_first"
+   ],
+   "ui_chara_ids": [
+    "0x143829f67e",
+    "0x14c6fc852a"
+   ],
+   "word": "0xc10073143829f67e",
+   "alternate": "0xc1007414c6fc852a",
+   "fighter_kind": "0x13ea13c533",
+   "kind": null,
+   "kind_rule": "none: two ui_chara rows share this tile",
+   "label_key": "nam_chr1_00_eflame_first",
+   "name": "Pyra/Mythra",
+   "disp_order": 80,
+   "dlc": true,
+   "mii": false,
+   "hover_focus": "css.grid.eflame_first",
+   "placed_focus": "css.medal.eflame_first",
+   "slot": "set_parts_chr_s_82",
+   "rect": [
+    -360.0,
+    -216.0,
+    -118.0,
+    -36.0
+   ]
+  },
+  {
+   "tile": 81,
+   "ui_rows": [
+    119
+   ],
+   "name_ids": [
+    "demon"
+   ],
+   "ui_chara_ids": [
+    "ui_chara_demon"
+   ],
+   "word": "0xc100770e6ea64e18",
+   "alternate": "0xc1ffff0000000000",
+   "fighter_kind": "0x12e075ea9a",
+   "kind": 92,
+   "kind_rule": "main kind table index",
+   "label_key": "nam_chr1_00_demon",
+   "name": "Kazuya",
+   "disp_order": 81,
+   "dlc": true,
+   "mii": false,
+   "hover_focus": "css.grid.demon",
+   "placed_focus": "css.medal.demon",
+   "slot": "set_parts_chr_s_83",
+   "rect": [
+    -216.0,
+    -72.0,
+    -118.0,
+    -36.0
+   ]
+  },
+  {
+   "tile": 82,
+   "ui_rows": [
+    120
+   ],
+   "name_ids": [
+    "trail"
+   ],
+   "ui_chara_ids": [
+    "ui_chara_trail"
+   ],
+   "word": "0xc100780e72c68972",
+   "alternate": "0xc1ffff0000000000",
+   "fighter_kind": "0x12fc152df0",
+   "kind": 93,
+   "kind_rule": "main kind table index",
+   "label_key": "nam_chr1_00_trail",
+   "name": "Sora",
+   "disp_order": 82,
+   "dlc": true,
+   "mii": false,
+   "hover_focus": "css.grid.trail",
+   "placed_focus": "css.medal.trail",
+   "slot": "set_parts_chr_s_84",
+   "rect": [
+    -72.0,
+    72.0,
+    -118.0,
+    -36.0
+   ]
+  },
+  {
+   "tile": 83,
+   "ui_rows": [
+    76
+   ],
+   "name_ids": [
+    "miifighter"
+   ],
+   "ui_chara_ids": [
+    "ui_chara_miifighter"
+   ],
+   "word": "0xc1004c13fdfdfb2b",
+   "alternate": "0xc1ffff0000000000",
+   "fighter_kind": "0x17de1da827",
+   "kind": 72,
+   "kind_rule": "main kind table index",
+   "label_key": "nam_chr1_00_miifighter",
+   "name": "Mii Brawler",
+   "disp_order": 84,
+   "dlc": false,
+   "mii": true,
+   "hover_focus": "css.grid.miifighter",
+   "placed_focus": "css.medal.miifighter",
+   "slot": "set_parts_chr_s_85",
+   "rect": [
+    72.0,
+    216.0,
+    -118.0,
+    -36.0
+   ]
+  },
+  {
+   "tile": 84,
+   "ui_rows": [
+    77
+   ],
+   "name_ids": [
+    "miiswordsman"
+   ],
+   "ui_chara_ids": [
+    "ui_chara_miiswordsman"
+   ],
+   "word": "0xc1004d15d7061f77",
+   "alternate": "0xc1ffff0000000000",
+   "fighter_kind": "0x1989d173d5",
+   "kind": 73,
+   "kind_rule": "main kind table index",
+   "label_key": "nam_chr1_00_miiswordsman",
+   "name": "Mii Swordfighter",
+   "disp_order": 85,
+   "dlc": false,
+   "mii": true,
+   "hover_focus": "css.grid.miiswordsman",
+   "placed_focus": "css.medal.miiswordsman",
+   "slot": "set_parts_chr_s_86",
+   "rect": [
+    216.0,
+    360.0,
+    -118.0,
+    -36.0
+   ]
+  },
+  {
+   "tile": 85,
+   "ui_rows": [
+    78
+   ],
+   "name_ids": [
+    "miigunner"
+   ],
+   "ui_chara_ids": [
+    "ui_chara_miigunner"
+   ],
+   "word": "0xc1004e1257ab1d87",
+   "alternate": "0xc1ffff0000000000",
+   "fighter_kind": "0x166e9fae70",
+   "kind": 74,
+   "kind_rule": "main kind table index",
+   "label_key": "nam_chr1_00_miigunner",
+   "name": "Mii Gunner",
+   "disp_order": 86,
+   "dlc": false,
+   "mii": true,
+   "hover_focus": "css.grid.miigunner",
+   "placed_focus": "css.medal.miigunner",
+   "slot": "set_parts_chr_s_87",
+   "rect": [
+    360.0,
+    504.0,
+    -118.0,
+    -36.0
+   ]
+  },
+  {
+   "tile": 86,
+   "ui_rows": [
+    0
+   ],
+   "name_ids": [
+    "random"
+   ],
+   "ui_chara_ids": [
+    "ui_chara_random"
+   ],
+   "word": "0xc100000fd5f7fa78",
+   "alternate": "0xc1ffff0000000000",
+   "fighter_kind": "0x13d6cfcbd0",
+   "kind": null,
+   "kind_rule": "none: fighter_kind is not in the main kind table",
+   "label_key": "nam_chr1_00_random",
+   "name": "Random",
+   "disp_order": 99,
+   "dlc": false,
+   "mii": false,
+   "hover_focus": "css.grid.random",
+   "placed_focus": "css.medal.random",
+   "slot": "set_parts_chr_s_88",
+   "rect": [
+    504.0,
+    648.0,
+    -118.0,
+    -36.0
+   ]
+  }
+ ],
+ "provenance": {
+  "generator": "tools/css-table/generate.py",
+  "readers": {
+   "arc_extract.py": "56ee79e0fbc3ccea42742382d36e1b806fb0aea514b7a687b7c1d8ee53e50716",
+   "prc.py": "36de860036227f3e4df5be5e5f79e8ad049dddb4486a672e031a3a0638f94a93"
+  },
+  "assets": {
+   "chara_db": {
+    "path": "ui/param/database/ui_chara_db.prc",
+    "path_hash40": "0x2100e411d9",
+    "region": 0,
+    "arc_offset": 5090167208,
+    "comp_size": 7400,
+    "size": 34753,
+    "sha256": "c65a0da57a20fe790c2f0948d017a54c4885341885d9a30866c590ccf380f380"
+   },
+   "names": {
+    "path": "ui/message/msg_name.msbt",
+    "path_hash40": "0x18393b2070",
+    "region": 2,
+    "arc_offset": 2614345480,
+    "comp_size": 109717,
+    "size": 490336,
+    "sha256": "9efc357db8ea46e671222dbbd90bbdc0ea5455383090fae3fe2ba6017e9da3ad"
+   },
+   "layout": {
+    "path": "ui/layout/menu/chara_select/chara_select/layout.arc",
+    "path_hash40": "0x3399c376cf",
+    "region": 0,
+    "arc_offset": 9556486792,
+    "comp_size": 1150826,
+    "size": 4303120,
+    "sha256": "751fede427d5072f3c9aa0939c677f1d2abb54f0a6190bf06ad5550d1b0f4150"
+   }
+  },
+  "main": {
+   "file": "main NSO, uncompressed",
+   "sha256": "8b3dc2eb011f26dda1f87947e4f62665e8d8fe3d84397e85ecf9b3cd9d0137ce",
+   "build_id": "21450c647b8c5940ed5b68218ea128fd3c5d597d",
+   "kind_table": "main+0x453cc58",
+   "file_offset": "0x453cd58",
+   "entries": 94,
+   "table_sha256": "b1303565c231279055a1cba11e2cf2270896ec3b93a97d9450bfa9847a36ea76"
+  },
+  "layout": {
+   "pane_file": "blyt/chara_select.bflyt",
+   "pane_file_sha256": "192d62a03e7beae16587162af9abffd424d2453425874bbc6b02261eaf019e3a",
+   "columns": 13,
+   "rows": 7,
+   "pitch": [
+    144.0,
+    82.0
+   ],
+   "last_row_tiles": 9,
+   "last_row_shift": 2,
+   "set_chr_area": {
+    "at": [
+     0.0,
+     169.0
+    ],
+    "size": [
+     1868.0,
+     572.0
+    ]
+   }
+  },
+  "rules": [
+   "tile order: ui_chara_db rows with disp_order >= 0 sorted by (disp_order, row), excluding the combined Mii row (is_mii=1, fighter_kind=0)",
+   "rows sharing a disp_order share one tile: first row = typed word, second row = alternate word",
+   "typed word = 0xc1 << 56 | ui_chara_db row << 40 | hash40(ui_chara_id)",
+   "application kind = index of the ui_chara fighter_kind hash in the main kind table; ice_climber plays fighter_kind_popo; composite tiles and Random have none",
+   "caption = English msg_name nam_chr1_00_<name_id> (else nam_chr0_00_<name_id>), trailing space trimmed",
+   "rect = slot centre +- half the slot pitch; the partial last row is centred on the 13-column grid"
+  ]
+ }
+}

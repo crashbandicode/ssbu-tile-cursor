@@ -99,7 +99,7 @@ pub(super) unsafe fn collect(css: u64, view: &View, sample: &mut Sample) {
         // The default-variant branch at 0x19f2014 reads the first u64 in this
         // same 0xb0-stride vector. Other variants have not been qualified.
         let word = read_u64(view.tiles.begin + u64::from(index) * view.tiles.stride);
-        fighter_identity(panel_kind, word, variant, stable)
+        fighter_identity(index, panel_kind, word, variant, stable)
     };
     let index = u16::try_from(read_i32(medal + 0x1c))
         .ok()

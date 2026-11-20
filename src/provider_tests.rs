@@ -1,4 +1,5 @@
 use super::*;
+use crate::css_table::CSS_GEOMETRY;
 use crate::model::{pack_step, Step as NativeStep};
 
 fn api() -> Api {
@@ -45,6 +46,45 @@ fn discovery_never_bursts_or_restarts_after_cutoff() {
     assert!(!late.due(3 * TICKS_PER_SECOND));
     late.finish();
     assert!(!late.due(4 * TICKS_PER_SECOND));
+}
+
+#[test]
+fn generated_table_reproduces_the_captured_stock_layout() {
+    use crate::layout::Layout;
+
+    let captured = include_bytes!("layouts/css.bin");
+    let bounds = [
+        u64::from_le_bytes(captured[0..8].try_into().unwrap()),
+        u64::from_le_bytes(captured[8..16].try_into().unwrap()),
+    ];
+    for (i, tile) in CSS_TILES.iter().enumerate() {
+        let offset = 16 + 32 * i;
+        let word = u64::from_le_bytes(captured[offset..offset + 8].try_into().unwrap());
+        let alternate =
+            u64::from_le_bytes(captured[offset + 8..offset + 16].try_into().unwrap());
+        let rect = [
+            f32::from_le_bytes(captured[offset + 16..offset + 20].try_into().unwrap()),
+            f32::from_le_bytes(captured[offset + 20..offset + 24].try_into().unwrap()),
+            f32::from_le_bytes(captured[offset + 24..offset + 28].try_into().unwrap()),
+            f32::from_le_bytes(captured[offset + 28..offset + 32].try_into().unwrap()),
+        ];
+        assert_eq!(tile.word, word, "tile {i}");
+        assert_eq!(CSS_GEOMETRY[i].0, alternate, "tile {i}");
+        assert_eq!(CSS_GEOMETRY[i].1, rect, "tile {i}");
+    }
+    assert_eq!(
+        Layout::identify(Screen::Css, 87, bounds, |i| {
+            let rect = CSS_GEOMETRY[i].1;
+            (
+                [CSS_TILES[i].word, CSS_GEOMETRY[i].0],
+                [
+                    u64::from(rect[0].to_bits()) | (u64::from(rect[1].to_bits()) << 32),
+                    u64::from(rect[2].to_bits()) | (u64::from(rect[3].to_bits()) << 32),
+                ],
+            )
+        }),
+        Some(Layout::Css)
+    );
 }
 
 #[test]
@@ -225,13 +265,16 @@ fn overwritten_mailbox_preserves_newest_complete_owner_and_counters() {
 #[test]
 fn observed_default_steve_requires_matching_typed_tile_and_current_panel() {
     let typed = 0xc100_700f_dc91_574e;
-    let good = |panel, tile, variant, settled| fighter_identity(panel, tile, variant, settled);
-    assert_eq!(good(typed, typed, [0, 0], true), Some(Fighter::Steve));
-    assert_eq!(good(0xc1ff_ff00_0000_0000, typed, [0, 0], true), None);
-    assert_eq!(good(typed, typed, [1, 0], true), None);
-    assert_eq!(good(typed, typed, [0, 1], true), None);
-    assert_eq!(good(typed, typed, [0, 0], false), None);
-    assert_eq!(good(typed, typed ^ 1, [0, 0], true), None);
+    let good = |index, panel, tile, variant, settled| {
+        fighter_identity(index, panel, tile, variant, settled)
+    };
+    assert_eq!(good(78, typed, typed, [0, 0], true), Some(Fighter(78)));
+    assert_eq!(good(78, 0xc1ff_ff00_0000_0000, typed, [0, 0], true), None);
+    assert_eq!(good(78, typed, typed, [1, 0], true), None);
+    assert_eq!(good(78, typed, typed, [0, 1], true), None);
+    assert_eq!(good(78, typed, typed, [0, 0], false), None);
+    assert_eq!(good(66, typed, typed, [0, 0], true), None);
+    assert_eq!(good(78, typed, typed ^ 1, [0, 0], true), None);
 }
 
 #[test]
@@ -256,7 +299,7 @@ fn native_p1_medal_requires_own_slot_and_matching_committed_placement() {
     p.panel_flags = [0, 1];
     p.placed = Some(78);
     p.rect_matches = true;
-    p.placed_fighter = Some(Fighter::Steve);
+    p.placed_fighter = Some(Fighter(78));
     assert_eq!(p.token(), P1Token::Placed);
     p.panel_flags = [1, 1];
     assert_eq!(p.token(), P1Token::Unknown);
@@ -280,7 +323,7 @@ fn qualified_native_p1_identity_is_separate_from_local_and_expires() {
         hover: Some(78),
         p1_carried: Some(0),
         p1_token: P1Token::Held,
-        fighter: Some(Fighter::Steve),
+        fighter: Some(Fighter(78)),
         ..Sample::default()
     };
     let held = block(&mut p, 1, Some(s), true);
@@ -293,7 +336,7 @@ fn qualified_native_p1_identity_is_separate_from_local_and_expires() {
     s.fighter = None;
     s.hover = None;
     s.p1_token = P1Token::Placed;
-    s.p1_placed = Some((78, Fighter::Steve));
+    s.p1_placed = Some((78, Fighter(78)));
     let placed = block(&mut p, 2, Some(s), true);
     assert!(placed.contains("\np1.token=placed\np1.placed.at=78\np1.placed.kind=88\np1.placed.name=\"Steve\"\np1.placed.form=default\n"));
     assert!(placed.contains("\nkind=unknown\n"));
@@ -356,7 +399,7 @@ fn guest_seat_identity_does_not_publish_native_p1_geometry_as_a_local_hover() {
         local_seat: Some(1),
         at: Some(78),
         hover: Some(78),
-        fighter: Some(Fighter::Steve),
+        fighter: Some(Fighter(78)),
         tick: 1,
         observation: 1,
         resting: true,
@@ -408,7 +451,7 @@ fn offline_local_identity_requires_positive_owned_medal_and_direct_seat_zero() {
     s.observation = 2;
     s.p1_carried = None;
     s.p1_token = P1Token::Placed;
-    s.p1_placed = Some((78, Fighter::Steve));
+    s.p1_placed = Some((78, Fighter(78)));
     let placed = block(&mut p, 2, Some(s), true);
     for row in [
         "carried=none",
@@ -549,7 +592,7 @@ fn qualified_css_control_has_fresh_entry_held_and_placed_focus() {
     s.css_entry = false;
     s.at = Some(78);
     s.hover = Some(78);
-    s.fighter = Some(Fighter::Steve);
+    s.fighter = Some(Fighter(78));
     assert!(wire(s).contains("\nfocus=css.grid.steve\n"));
     s.at = Some(77);
     assert!(wire(s).contains("\nfocus=unknown\n"));
@@ -557,7 +600,7 @@ fn qualified_css_control_has_fresh_entry_held_and_placed_focus() {
     s.p1_token = P1Token::Placed;
     s.hover = None;
     s.fighter = None;
-    s.p1_placed = Some((78, Fighter::Steve));
+    s.p1_placed = Some((78, Fighter(78)));
     assert!(wire(s).contains("\nfocus=css.medal.steve\n"));
     s.local_seat = Some(1);
     assert!(wire(s).contains("\nfocus=unknown\n"));
@@ -583,7 +626,7 @@ fn takeback_starts_an_idle_action_scope_on_the_same_grid() {
         p1_token: P1Token::Held,
         p1_carried: Some(0),
         resting: true,
-        fighter: Some(Fighter::Steve),
+        fighter: Some(Fighter(78)),
         at: Some(78),
         hover: Some(78),
         ..Sample::default()
@@ -634,7 +677,7 @@ fn only_the_direct_qualified_entry_step_keeps_tile_focus_while_easing() {
     s.at = Some(78);
     s.hover = Some(78);
     assert!(show(s).contains("\nsettled=0\n"));
-    s.fighter = Some(Fighter::Steve);
+    s.fighter = Some(Fighter(78));
     assert!(show(s).contains("\nfocus=css.grid.steve\n"));
     s.fighter = None;
     s.hand_steppable = false;

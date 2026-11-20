@@ -1,5 +1,6 @@
 //! The optional tile.cursor/1 producer. Only the existing writer touches discovery,
 //! serialization and revision tracking. An observed main-thread owner sends values.
+use crate::css_table::CSS_TILES;
 use crate::layout::Layout;
 use crate::model::{Dir, Line, Screen, TICKS_PER_SECOND};
 use core::cell::UnsafeCell;
@@ -182,30 +183,46 @@ pub fn local_seat(rows: &[SeatInput]) -> Option<u8> {
     }
 }
 
-/// The exact typed stock UI identity observed at the Steve preview. The low
-/// 40 bits are Hash40("ui_chara_pickel"); the tag and default variant are
-/// checked before exposing the app fighter kind from the release table.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum Fighter {
-    Steve,
-}
+pub struct Fighter(u16);
 
 impl Fighter {
-    pub fn id(self) -> u16 {
-        match self {
-            Self::Steve => 88,
-        }
+    pub fn tile(self) -> u16 {
+        self.0
     }
+
+    pub fn id(self) -> Option<u16> {
+        CSS_TILES[usize::from(self.0)].kind
+    }
+
     pub fn name(self) -> &'static str {
-        match self {
-            Self::Steve => "\"Steve\"",
-        }
+        CSS_TILES[usize::from(self.0)].name
+    }
+
+    pub fn hover_focus(self) -> &'static str {
+        CSS_TILES[usize::from(self.0)].hover_focus
+    }
+
+    pub fn placed_focus(self) -> &'static str {
+        CSS_TILES[usize::from(self.0)].placed_focus
     }
 }
 
-pub fn fighter_identity(panel: u64, tile: u64, variant: [u8; 2], settled: bool) -> Option<Fighter> {
-    (settled && variant == [0, 0] && panel == tile && tile == 0xc100_700f_dc91_574e)
-        .then_some(Fighter::Steve)
+pub fn fighter_identity(
+    index: u16,
+    panel: u64,
+    tile: u64,
+    variant: [u8; 2],
+    settled: bool,
+) -> Option<Fighter> {
+    (settled
+        && variant == [0, 0]
+        && panel == tile
+        && CSS_TILES
+            .get(usize::from(index))
+            .is_some_and(|record| record.word == tile)
+        && index == 78)
+        .then_some(Fighter(index))
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -402,6 +419,18 @@ impl<T: fmt::Display> fmt::Display for Field<T> {
     }
 }
 
+#[derive(Clone, Copy)]
+struct PublishedName(&'static str, bool);
+impl fmt::Display for PublishedName {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if self.1 {
+            write!(f, "\"{}\"", self.0)
+        } else {
+            f.write_str(self.0)
+        }
+    }
+}
+
 #[derive(Default)]
 pub struct Publisher {
     revision: u64,
@@ -470,7 +499,7 @@ impl Publisher {
         let settled = p1_view
             && s.resting
             && (s.at.is_some() && s.at == s.hover || entry)
-            && (!entry_step || s.fighter == Some(Fighter::Steve))
+            && (!entry_step || s.fighter.map(Fighter::tile) == Some(78))
             && (s.screen != Some(Screen::Sss) || stage.is_some());
         // Tile-local focus is bound to the released direct hand. The separate ssbu.ui
         // foreground and input-owner block must authorize any subsequent controller action.
@@ -479,12 +508,15 @@ impl Publisher {
             (true, P1Token::Held)
                 if settled
                     && s.at == Some(78)
-                    && s.fighter == Some(Fighter::Steve)
+                    && s.fighter.map(Fighter::tile) == Some(78)
                     && s.p1_carried == Some(0) =>
             {
                 "css.grid.steve"
             }
-            (true, P1Token::Placed) if s.p1_placed == Some((78, Fighter::Steve)) => {
+            (true, P1Token::Placed)
+                if s.p1_placed
+                    .is_some_and(|(index, fighter)| index == 78 && fighter.tile() == index) =>
+            {
                 "css.medal.steve"
             }
             _ if sss_grid && s.stage_moving => "sss.grid.moving",
@@ -536,15 +568,14 @@ impl Publisher {
         let _ = write!(
             buf,
             "\nkind={}\nname={}\nform={}",
+            Field(match fighter {
+                Some(fighter) => fighter.id(),
+                None => stage.map(crate::stage::Stage::id),
+            }),
             Field(
                 fighter
-                    .map(Fighter::id)
-                    .or_else(|| stage.map(crate::stage::Stage::id))
-            ),
-            Field(
-                fighter
-                    .map(Fighter::name)
-                    .or_else(|| stage.map(crate::stage::Stage::name))
+                    .map(|fighter| PublishedName(fighter.name(), true))
+                    .or_else(|| stage.map(|stage| PublishedName(stage.name(), false)))
             ),
             Field(
                 fighter
@@ -565,8 +596,8 @@ impl Publisher {
             buf,
             "\np1.placed.at={}\np1.placed.kind={}\np1.placed.name={}\np1.placed.form={}",
             Field(placed.map(|x| x.0)),
-            Field(placed.map(|x| x.1.id())),
-            Field(placed.map(|x| x.1.name())),
+            Field(placed.and_then(|x| x.1.id())),
+            Field(placed.map(|x| PublishedName(x.1.name(), true))),
             Field(placed.map(|_| "default"))
         );
         let _ = write!(
@@ -574,8 +605,8 @@ impl Publisher {
             "\nlocal.token={}\nplaced.at={}\nplaced.kind={}\nplaced.name={}\nplaced.form={}",
             local_token.name(),
             Field(local_placed.map(|x| x.0)),
-            Field(local_placed.map(|x| x.1.id())),
-            Field(local_placed.map(|x| x.1.name())),
+            Field(local_placed.and_then(|x| x.1.id())),
+            Field(local_placed.map(|x| PublishedName(x.1.name(), true))),
             Field(local_placed.map(|_| "default"))
         );
         let _ = write!(
