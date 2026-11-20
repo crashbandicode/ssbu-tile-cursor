@@ -581,7 +581,7 @@ impl Publisher {
                 fighter
                     .map(|fighter| PublishedName(fighter.name(), true))
                     .or_else(|| stage.map(|stage| PublishedName(stage.name(), false)))
-             ),
+            ),
             Field(
                 fighter
                     .map(|_| "default")
