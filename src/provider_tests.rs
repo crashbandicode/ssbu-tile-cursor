@@ -435,14 +435,14 @@ fn captured_vectors_reproduce_offline_entry_and_normal_stage_neighbors() {
         }
     };
     let css = include_bytes!("layouts/css.bin");
-    let tiles: Vec<_> = css[16..].chunks_exact(32).map(|r| rect(&r[16..])).collect();
+    let tiles: Vec<_> = css[16..].as_chunks::<32>().0.iter().map(|r| rect(&r[16..])).collect();
     let step = neighbour(tiles.as_slice(), (-599., -236.), Dir::Up, &rect(css));
     assert_eq!(
         (step.from, step.to, step.target),
         (None, Some(78), (-576., -77.))
     );
     let sss = include_bytes!("layouts/sss.bin");
-    let tiles: Vec<_> = sss[16..].chunks_exact(24).map(|r| rect(&r[8..])).collect();
+    let tiles: Vec<_> = sss[16..].as_chunks::<24>().0.iter().map(|r| rect(&r[8..])).collect();
     let step = neighbour(tiles.as_slice(), (-189., 358.), Dir::Right, &rect(sss));
     assert_eq!(
         (step.from, step.to, step.target),

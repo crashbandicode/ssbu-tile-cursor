@@ -45,9 +45,9 @@ pub struct StageFacts {
 pub fn actor_code_matches(code: &[u8]) -> bool {
     code.len() == 336
         && code
-            .chunks_exact(4)
+            .as_chunks::<4>().0.iter()
             .fold(0xcbf2_9ce4_8422_2325u64, |hash, word| {
-                let value = u32::from_le_bytes(word.try_into().unwrap());
+                let value = u32::from_le_bytes(*word);
                 (hash ^ u64::from(value)).wrapping_mul(0x100_0000_01b3)
             })
             == 0x8b59_26a8_6bad_684e
