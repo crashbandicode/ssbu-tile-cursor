@@ -185,7 +185,7 @@ pub(super) unsafe fn close_update() {
 
 pub(super) unsafe fn begin(owner: u64, view: &View, sample: &Sample) -> bool {
     let s = &mut *READER.0.get();
-    let lua = (sample.grid == Some(crate::layout::Layout::Sss) && sample.hand_steppable)
+    let lua = (sample.grid.and_then(crate::layout::Layout::stage_count).is_some() && sample.hand_steppable)
         .then(|| owner_lua(owner))
         .flatten()
         .unwrap_or(0);
@@ -248,11 +248,13 @@ pub(super) unsafe fn finish(owner: u64, sample: &mut Sample) -> bool {
     let Some(view) = sss_view(owner) else {
         return true;
     };
+    let Some(layout) = sample.grid else {
+        return true;
+    };
     if view.cursor != s.cursor
         || view.tiles.begin != s.tiles
         || !view.steppable
-        || view.tiles.count != 116
-        || sample.grid != Some(crate::layout::Layout::Sss)
+        || layout.stage_count() != Some(view.tiles.count)
     {
         return true;
     }
@@ -276,6 +278,7 @@ pub(super) unsafe fn finish(owner: u64, sample: &mut Sample) -> bool {
     s.token = Some(tok);
     if s.invalid_getter
         || tok == P1Token::Unknown
+        || (layout == crate::layout::Layout::OrdinarySss && tok != P1Token::Held)
         || rec[0].form != 0
         || rec[1..].iter().any(|p| p.kind != INVALID_KIND)
     {
@@ -297,6 +300,7 @@ pub(super) unsafe fn finish(owner: u64, sample: &mut Sample) -> bool {
         if let Ok(i) = usize::try_from(actor.getter) {
             if i < view.tiles.count {
                 sample.stage = qualified_stage(StageFacts {
+                    layout,
                     tab: actor.tab,
                     slot: actor.slot,
                     getter: actor.getter,

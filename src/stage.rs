@@ -1,4 +1,5 @@
-//! Qualified local Training stage preview for the one native hand and slot.
+//! Qualified local stage-select preview for the one native hand and slot.
+use crate::layout::Layout;
 use crate::provider::Step;
 
 /// Start from a qualified rest and the next local step emitted after its target write.
@@ -21,6 +22,9 @@ pub fn start_move(
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Stage {
+    RandomNormal,
+    RandomBattlefield,
+    RandomOmega,
     Training,
     Battlefield,
     SmallBattlefield,
@@ -29,17 +33,22 @@ pub enum Stage {
 }
 
 impl Stage {
-    pub fn id(self) -> u16 {
-        match self {
+    // Random controls identify a picker action and have no concrete destination.
+    pub fn id(self) -> Option<u16> {
+        Some(match self {
+            Self::RandomNormal | Self::RandomBattlefield | Self::RandomOmega => return None,
             Self::Training => 308,
             Self::Battlefield => 0,
             Self::SmallBattlefield => 347,
             Self::BigBattlefield => 2,
             Self::FinalDestination => 3,
-        }
+        })
     }
     pub fn name(self) -> &'static str {
         match self {
+            Self::RandomNormal => "Random Normal",
+            Self::RandomBattlefield => "Random Battlefield",
+            Self::RandomOmega => "Random Omega",
             Self::Training => "Training",
             Self::Battlefield => "Battlefield",
             Self::SmallBattlefield => "Small Battlefield",
@@ -58,6 +67,7 @@ pub struct Preview {
 
 #[derive(Clone, Copy)]
 pub struct StageFacts {
+    pub layout: Layout,
     pub tab: i64,
     pub slot: i64,
     pub getter: i32,
@@ -93,7 +103,18 @@ pub fn qualified_stage(s: StageFacts) -> Option<Stage> {
     {
         return None;
     }
-    match (p.panel, p.kind) {
+    let panel = match s.layout {
+        Layout::OrdinarySss => match (p.panel, p.kind) {
+            (0, 0x6900_0116_6fbc_7641) => return Some(Stage::RandomNormal),
+            (1, 0x6900_021c_23e8_aab5) => return Some(Stage::RandomBattlefield),
+            (2, 0x6900_0313_bb95_239c) => return Some(Stage::RandomOmega),
+            (3..=6, _) => p.panel - 2,
+            _ => return None,
+        },
+        Layout::Sss => p.panel,
+        Layout::Css => return None,
+    };
+    match (panel, p.kind) {
         (0, 0x6900_6d11_6b90_4091) => Some(Stage::Training),
         (1, 0x6900_0415_4b5c_4392) => Some(Stage::Battlefield),
         (2, 0x6900_8817_1954_c00c) => Some(Stage::SmallBattlefield),
