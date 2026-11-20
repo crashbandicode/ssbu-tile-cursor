@@ -212,6 +212,7 @@ pub fn fighter_identity(panel: u64, tile: u64, variant: [u8; 2], settled: bool) 
 pub enum P1Token {
     #[default]
     Unknown,
+    None,
     Held,
     Placed,
 }
@@ -220,6 +221,7 @@ impl P1Token {
         match self {
             Self::Unknown => "unknown",
             Self::Held => "held",
+            Self::None => "none",
             Self::Placed => "placed",
         }
     }
@@ -260,6 +262,8 @@ pub struct Sample {
     pub generation: u64,
     pub screen: Option<Screen>,
     pub grid: Option<Layout>,
+    pub stage: Option<crate::stage::Stage>,
+    pub stage_moving: bool,
     pub css_entry: bool,
     pub hand_steppable: bool,
     pub at: Option<u16>,
@@ -290,6 +294,8 @@ impl Owner {
                 generation: 0,
                 screen: None,
                 grid: None,
+                stage: None,
+                stage_moving: false,
                 css_entry: false,
                 hand_steppable: false,
                 at: None,
@@ -438,6 +444,12 @@ impl Publisher {
             && s.screen == Some(Screen::Css)
             && s.grid == Some(Layout::Css)
             && s.local_seat == Some(0);
+        let sss_grid = active
+            && s.screen == Some(Screen::Sss)
+            && s.grid == Some(Layout::Sss)
+            && s.local_seat == Some(0)
+            && (s.stage.is_some() || s.stage_moving);
+        let stage = sss_grid.then_some(s.stage).flatten();
         let entry = css_grid
             && s.css_entry
             && s.resting
@@ -458,7 +470,8 @@ impl Publisher {
         let settled = p1_view
             && s.resting
             && (s.at.is_some() && s.at == s.hover || entry)
-            && (!entry_step || s.fighter == Some(Fighter::Steve));
+            && (!entry_step || s.fighter == Some(Fighter::Steve))
+            && (s.screen != Some(Screen::Sss) || stage.is_some());
         // Tile-local focus is bound to the released direct hand. The separate ssbu.ui
         // foreground and input-owner block must authorize any subsequent controller action.
         let focus = match (css_grid && s.resting, s.p1_token) {
@@ -474,10 +487,14 @@ impl Publisher {
             (true, P1Token::Placed) if s.p1_placed == Some((78, Fighter::Steve)) => {
                 "css.medal.steve"
             }
+            _ if sss_grid && s.stage_moving => "sss.grid.moving",
+            _ if sss_grid && settled => "sss.grid.normal",
             _ if entry_step && !settled => "css.grid.moving",
             _ => "unknown",
         };
-        let step_still_matches = settled && s.at == step.to && step.token == s.p1_carried;
+        let step_still_matches = settled
+            && s.at == step.to
+            && (s.screen == Some(Screen::Sss) || step.token == s.p1_carried);
         let _ = write!(buf, "schema=tile.cursor/1\nrev={rev}\nboot=0\nack={}\nack.result={result}\nfocus={focus}\nobservation={}\nobservation.active={}", step.ack, s.observation, u8::from(active));
         let fighter = p1_view.then_some(s.fighter).flatten();
         let token = if active { s.p1_token } else { P1Token::Unknown };
@@ -487,7 +504,7 @@ impl Publisher {
         let local_placed = local_p1.then_some(placed).flatten();
         let local_carried = match local_token {
             P1Token::Held if s.p1_carried == Some(0) => Endpoint::Index(0),
-            P1Token::Placed => Endpoint::None,
+            P1Token::Placed | P1Token::None => Endpoint::None,
             _ => Endpoint::Unknown,
         };
         let _ = write!(
@@ -495,7 +512,12 @@ impl Publisher {
             "\nscreen={}\ngeneration={}\nlayout={}\ngrid={}\nat={}\nhovered={}",
             Field(active.then_some(s.screen).flatten().map(Screen::name)),
             Field(active.then_some(s.generation)),
-            Field(css_grid.then_some(Layout::Css.name())),
+            Field(
+                (css_grid || sss_grid)
+                    .then_some(s.grid)
+                    .flatten()
+                    .map(Layout::name)
+            ),
             Field(active.then_some(s.grid).flatten().map(Layout::name)),
             if entry {
                 Endpoint::None
@@ -514,9 +536,21 @@ impl Publisher {
         let _ = write!(
             buf,
             "\nkind={}\nname={}\nform={}",
-            Field(fighter.map(Fighter::id)),
-            Field(fighter.map(Fighter::name)),
-            Field(fighter.map(|_| "default"))
+            Field(
+                fighter
+                    .map(Fighter::id)
+                    .or_else(|| stage.map(crate::stage::Stage::id))
+            ),
+            Field(
+                fighter
+                    .map(Fighter::name)
+                    .or_else(|| stage.map(crate::stage::Stage::name))
+            ),
+            Field(
+                fighter
+                    .map(|_| "default")
+                    .or_else(|| stage.map(|_| "normal"))
+            )
         );
         let _ = write!(
             buf,

@@ -87,8 +87,13 @@ The independent `grid` field identifies a matching native vector. On normal
 Training SSS, `grid=sss.9892b3a32e5c0164` identifies the captured vector and
 clamp. [topologies/training-sss.json](topologies/training-sss.json) records
 the observed rightward edges Training → Battlefield → Small Battlefield.
-Actionable SSS layout, focus, native hover and selection identity remain
-unknown pending active Lua slot and tab qualification. A stale owner expires after 300 ms.
+On the offline Training route, the active stage actor on the Normal tab must
+agree with its single slot-zero native preview, typed tile, form and the current
+hand. The covered panels are Training, Battlefield and Small Battlefield. An
+acknowledged move can report `sss.grid.moving` until the accepted rest and live
+actor agree again. The runner independently checks the committed Training stage
+scene. An ambiguous medal, another occupied preview slot or a non-Normal form
+clears actionable stage fields. A stale owner expires after 300 ms.
 
 ## Build
 

@@ -15,27 +15,38 @@ impl Layout {
         }
     }
 
-    /// Match all native entry kinds, including CSS alternates, every rect and the hand clamp.
-    /// The ID printed on the wire names this exact comparison; the game thread never hashes.
+    /// Fingerprint the bounds, ordered typed entries and each rectangle in place.
+    /// Reference capture bytes are host-test fixtures and do not enter the NRO.
     pub fn identify(
         screen: Screen,
         count: usize,
-        bounds: &[u8],
-        mut matches: impl FnMut(usize, &[u8], &[u8]) -> bool,
+        bounds: [u64; 2],
+        mut row: impl FnMut(usize) -> ([u64; 2], [u64; 2]),
     ) -> Option<Self> {
-        let (layout, reference, kinds): (Layout, &[u8], usize) = match screen {
-            Screen::Css => (Self::Css, include_bytes!("layouts/css.bin"), 16),
-            Screen::Sss => (Self::Sss, include_bytes!("layouts/sss.bin"), 8),
+        let (layout, n, expected) = match screen {
+            Screen::Css => (Self::Css, 87, 0x94d7_3f6e_a8ed_a7e2),
+            Screen::Sss => (Self::Sss, 116, 0xd8c7_5452_465e_7857),
         };
-        let row = kinds + 16;
-        if bounds != &reference[..16] || count != (reference.len() - 16) / row {
+        if count != n {
             return None;
         }
-        reference[16..]
-            .chunks_exact(row)
-            .enumerate()
-            .all(|(i, tile)| matches(i, &tile[..kinds], &tile[kinds..]))
-            .then_some(layout)
+        let mut hash = 0xcbf2_9ce4_8422_2325u64;
+        let mut add = |word| {
+            hash = (hash ^ word).wrapping_mul(0x100_0000_01b3);
+        };
+        for word in bounds {
+            add(word);
+        }
+        for i in 0..n {
+            let (kinds, rect) = row(i);
+            add(kinds[0]);
+            if screen == Screen::Css {
+                add(kinds[1]);
+            }
+            add(rect[0]);
+            add(rect[1]);
+        }
+        (hash == expected).then_some(layout)
     }
 }
 

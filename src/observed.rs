@@ -1,6 +1,8 @@
 //! Discovery and observed owner callbacks. `main` is the only hook installer.
 #[path = "p1.rs"]
 mod p1;
+#[path = "stage_reader.rs"]
+mod stage_reader;
 use super::*;
 use crate::provider::{Api, Discovery, Header, Mailbox, Owner, Publisher, Registered};
 use core::mem::MaybeUninit;
@@ -86,8 +88,22 @@ pub(super) fn optional_mismatch() -> Option<&'static str> {
     p1::GUARDS
         .iter()
         .chain(core::iter::once(&SSS_KIND))
+        .chain(stage_reader::GUARDS)
         .find(|site| !unsafe { guard_matches(site) })
         .map(|s| s.name)
+}
+
+pub(super) fn prepare_stage() {
+    stage_reader::prepare(unsafe { getRegionAddress(Region::Text) } as u64);
+}
+pub(super) unsafe fn stage_getter(ctx: &InlineCtx) {
+    stage_reader::getter(ctx);
+}
+pub(super) unsafe fn stage_resumed(object: u64) {
+    let owner = &mut *OWNER.0.get();
+    if stage_reader::finish(object, &mut owner.latest) {
+        MAIL.offer(owner.latest);
+    }
 }
 
 pub(super) struct Worker {
@@ -157,17 +173,29 @@ impl Worker {
 
 /// Compare stable stock fields directly while the registered owner holds the vector.
 unsafe fn grid(screen: Screen, view: &View) -> Option<crate::layout::Layout> {
-    let bounds =
-        core::slice::from_raw_parts((view.cursor + cursor::BOUNDS as u64) as *const u8, 16);
-    crate::layout::Layout::identify(screen, view.tiles.count, bounds, |i, kinds, rect| {
-        let base = view.tiles.begin + i as u64 * view.tiles.stride;
-        core::slice::from_raw_parts(base as *const u8, kinds.len()) == kinds
-            && core::slice::from_raw_parts((base + view.tiles.rect) as *const u8, rect.len())
-                == rect
-    })
+    let b = view.cursor + cursor::BOUNDS as u64;
+    crate::layout::Layout::identify(
+        screen,
+        view.tiles.count,
+        [read_u64(b), read_u64(b + 8)],
+        |i| {
+            let base = view.tiles.begin + i as u64 * view.tiles.stride;
+            let rect = base + view.tiles.rect;
+            let alternate = if screen == Screen::Css {
+                read_u64(base + 8)
+            } else {
+                0
+            };
+            (
+                [read_u64(base), alternate],
+                [read_u64(rect), read_u64(rect + 8)],
+            )
+        },
+    )
 }
 
 pub(super) unsafe fn observe(screen: Screen, object: u64, view: Option<View>) {
+    stage_reader::close_update();
     let owner = &mut *OWNER.0.get();
     let now = tick();
     let Some(view) = view else {
@@ -199,7 +227,7 @@ pub(super) unsafe fn observe(screen: Screen, object: u64, view: Option<View>) {
     let target = read_point(view.cursor + cursor::TARGET as u64);
     sample.at = tile_at(&view.tiles, current).map(|i| i as u16);
     sample.p1_carried = view.token.map(|i| i as u16);
-    if sample.p1_carried != previous_token {
+    if screen == Screen::Css && sample.p1_carried != previous_token {
         // A placed or reacquired token begins a new action scope on the same layout.
         sample.step.new_owner();
     }
@@ -232,11 +260,16 @@ pub(super) unsafe fn observe(screen: Screen, object: u64, view: Option<View>) {
                 // Require the original settle_token's native hover AND today's
                 // current-token hover. Pickup may switch tokens during easing.
                 if sample.at == Some((record >> 16) as u16)
-                    && sample.hover == Some((record >> 32) as u16)
+                    && (screen == Screen::Sss || sample.hover == Some((record >> 32) as u16))
                 {
-                    sample
-                        .step
-                        .settled(sample.at, sample.hover, sample.p1_carried);
+                    // On SSS this records only the accepted two-frame rest. The wire
+                    // releases the ACK only upon agreement with the live stage actor.
+                    let native = if screen == Screen::Sss {
+                        sample.at
+                    } else {
+                        sample.hover
+                    };
+                    sample.step.settled(sample.at, native, sample.p1_carried);
                 }
             }
             _ => {}
@@ -249,12 +282,18 @@ pub(super) unsafe fn observe(screen: Screen, object: u64, view: Option<View>) {
         sample.css_entry = view.steppable
             && crate::layout::supported_css_entry(sample.grid, current, sample.at, raw_hover);
     }
-    if sample.local_seat != previous_seat || sample.grid != previous_grid {
+    if screen == Screen::Css && sample.local_seat != previous_seat || sample.grid != previous_grid {
         sample.generation += 1;
         sample.step.new_owner();
         sample.resting = false;
         sample.fighter = None;
         sample.css_entry = false;
+    }
+    if screen == Screen::Sss {
+        sample.hand_steppable = view.steppable;
+        if stage_reader::begin(object, &view, sample) {
+            return;
+        }
     }
     MAIL.offer(*sample);
 }

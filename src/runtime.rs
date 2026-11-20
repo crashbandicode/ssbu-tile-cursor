@@ -436,9 +436,21 @@ unsafe fn observed_sss(ctx: &InlineCtx) {
     );
 }
 
+#[skyline::hook(offset = 0x1b3304c, inline)]
+unsafe fn stage_actor_return(ctx: &InlineCtx) {
+    observed::stage_getter(ctx);
+}
+
+#[skyline::hook(offset = 0x1b29dc0, inline)]
+unsafe fn stage_owner_resumed(ctx: &InlineCtx) {
+    observed::stage_resumed(ctx.registers[19].x());
+}
+
 fn install_cursor_hooks(observe: bool) {
     if observe {
+        observed::prepare_stage();
         skyline::install_hooks!(observed_css, observed_sss, tile_cursor_query);
+        skyline::install_hooks!(stage_actor_return, stage_owner_resumed);
     } else {
         skyline::install_hooks!(tile_cursor_css, tile_cursor_sss, tile_cursor_query);
     }

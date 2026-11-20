@@ -471,9 +471,14 @@ fn stock_grid_recognition_rejects_an_in_place_tile_or_clamp_change() {
     ] {
         let n = (bytes.len() - 16) / (kinds + 16);
         let identify = |b: &[u8], count| {
-            Layout::identify(screen, count, &b[..16], |i, k, r| {
+            let word =
+                |offset: usize| u64::from_le_bytes(b[offset..offset + 8].try_into().unwrap());
+            Layout::identify(screen, count, [word(0), word(8)], |i| {
                 let start = 16 + i * (kinds + 16);
-                &b[start..start + kinds] == k && &b[start + kinds..start + kinds + 16] == r
+                (
+                    [word(start), if kinds == 16 { word(start + 8) } else { 0 }],
+                    [word(start + kinds), word(start + kinds + 8)],
+                )
             })
         };
         assert_eq!(identify(bytes, n), Some(layout));
@@ -637,4 +642,107 @@ fn only_the_direct_qualified_entry_step_keeps_tile_focus_while_easing() {
     s.hand_steppable = true;
     s.local_seat = Some(1);
     assert!(show(s).contains("\nfocus=unknown\n"));
+}
+
+#[test]
+fn stage_wire_preserves_idle_and_ties_a_settled_pick_to_its_own_step() {
+    use crate::layout::Layout;
+    use crate::stage::Stage;
+    let base = Sample {
+        screen: Some(Screen::Sss),
+        grid: Some(Layout::Sss),
+        generation: 1,
+        observation: 10,
+        tick: 1,
+        at: Some(0),
+        hover: Some(0),
+        stage: Some(Stage::Training),
+        local_seat: Some(0),
+        p1_token: P1Token::None,
+        resting: true,
+        ..Sample::default()
+    };
+    let wire = |s: Sample| block(&mut Publisher::default(), 1, Some(s), true);
+    let has = |body: &str, s: &str| body.lines().any(|line| line == s);
+    let idle = wire(base);
+    for s in [
+        "focus=sss.grid.normal",
+        "layout=sss.9892b3a32e5c0164",
+        "kind=308",
+        "name=Training",
+        "form=normal",
+        "local.token=none",
+        "carried=none",
+        "seat=0",
+        "controller=0",
+        "settled=1",
+        "settled.ack=unknown",
+    ] {
+        assert!(has(&idle, s), "{s}");
+    }
+    let step = Step {
+        ack: 1,
+        applied: 1,
+        last_written: 1,
+        dir: Some(Dir::Right),
+        from: Some(0),
+        to: Some(1),
+        ..Step::default()
+    };
+    let moving = Sample {
+        stage: None,
+        stage_moving: true,
+        resting: false,
+        hover: None,
+        step,
+        ..base
+    };
+    let progress = wire(moving);
+    for s in [
+        "focus=sss.grid.moving",
+        "ack.result=handled",
+        "settled=0",
+        "settled.ack=unknown",
+        "kind=unknown",
+        "name=unknown",
+        "form=unknown",
+    ] {
+        assert!(has(&progress, s), "{s}");
+    }
+    let landed = wire(Sample {
+        at: Some(1),
+        hover: Some(1),
+        stage: Some(Stage::Battlefield),
+        step: Step {
+            settled_ack: Some(1),
+            ..step
+        },
+        ..base
+    });
+    for s in [
+        "focus=sss.grid.normal",
+        "kind=0",
+        "name=Battlefield",
+        "form=normal",
+        "settled=1",
+        "settled.ack=1",
+    ] {
+        assert!(has(&landed, s), "{s}");
+    }
+    let lost = wire(Sample {
+        stage: None,
+        local_seat: None,
+        hover: None,
+        p1_token: P1Token::Unknown,
+        ..moving
+    });
+    for s in [
+        "focus=unknown",
+        "layout=unknown",
+        "seat=unknown",
+        "settled=0",
+        "settled.ack=unknown",
+    ] {
+        assert!(has(&lost, s), "{s}");
+    }
 }

@@ -35,20 +35,28 @@ fn definitions(src: &str, bodies: &mut BTreeMap<String, Vec<Vec<String>>>) {
         if words[i] != "fn" || !matches!(words[i + 2].as_str(), "(" | "<") {
             continue;
         }
-        let Some(start) = (i + 2..words.len()).find(|&j| matches!(words[j].as_str(), "{" | ";")) else { continue };
+        let Some(start) = (i + 2..words.len()).find(|&j| matches!(words[j].as_str(), "{" | ";"))
+        else {
+            continue;
+        };
         if words[start] == ";" {
             continue;
         }
         let mut depth = 1;
-        let end = (start + 1..words.len()).find(|&j| {
-            match words[j].as_str() {
-                "{" => depth += 1,
-                "}" => depth -= 1,
-                _ => (),
-            }
-            depth == 0
-        }).expect("balanced function body");
-        bodies.entry(words[i + 1].clone()).or_default().push(words[start + 1..end].to_vec());
+        let end = (start + 1..words.len())
+            .find(|&j| {
+                match words[j].as_str() {
+                    "{" => depth += 1,
+                    "}" => depth -= 1,
+                    _ => (),
+                }
+                depth == 0
+            })
+            .expect("balanced function body");
+        bodies
+            .entry(words[i + 1].clone())
+            .or_default()
+            .push(words[start + 1..end].to_vec());
     }
 }
 
@@ -66,12 +74,40 @@ fn audit(sources: &[&str], roots: &[&str]) -> (BTreeSet<String>, Vec<String>) {
         }
         for body in &bodies[&name] {
             for (i, t) in body.iter().enumerate() {
-                if t.starts_with("svc") || t.contains("QueryMemory") || t.ends_with("Mutex") || t.ends_with("Event")
-                    || (t == "nn" && name != "tick") || matches!(t.as_str(), "skyline" | "nnsdk" | "std")
-                    || matches!(t.as_str(), "lock" | "RwLock" | "Condvar" | "spin_loop" | "yield_now"
-                        | "sleep" | "join" | "alloc" | "realloc" | "Box" | "Vec" | "String"
-                        | "format" | "println" | "thread" | "fs" | "ro" | "libc" | "LookupSymbol"
-                        | "send" | "register" | "poll" | "publish" | "transmute" | "p1_buttons")
+                if t.starts_with("svc")
+                    || t.contains("QueryMemory")
+                    || t.ends_with("Mutex")
+                    || t.ends_with("Event")
+                    || (t == "nn" && name != "tick")
+                    || matches!(t.as_str(), "skyline" | "nnsdk" | "std")
+                    || matches!(
+                        t.as_str(),
+                        "lock"
+                            | "RwLock"
+                            | "Condvar"
+                            | "spin_loop"
+                            | "yield_now"
+                            | "sleep"
+                            | "join"
+                            | "alloc"
+                            | "realloc"
+                            | "Box"
+                            | "Vec"
+                            | "String"
+                            | "format"
+                            | "println"
+                            | "thread"
+                            | "fs"
+                            | "ro"
+                            | "libc"
+                            | "LookupSymbol"
+                            | "send"
+                            | "register"
+                            | "poll"
+                            | "publish"
+                            | "transmute"
+                            | "p1_buttons"
+                    )
                 {
                     violations.push(format!("{name} reaches {t}"));
                 }
@@ -91,14 +127,45 @@ fn audit(sources: &[&str], roots: &[&str]) -> (BTreeSet<String>, Vec<String>) {
 #[test]
 fn lock_order_optional_owners_reach_only_nonblocking_capture() {
     let sources = [
-        include_str!("../src/runtime.rs"), include_str!("../src/observed.rs"),
-        include_str!("../src/p1.rs"), include_str!("../src/layout.rs"),
-        include_str!("../src/provider.rs"), include_str!("../src/model.rs"),
+        include_str!("../src/runtime.rs"),
+        include_str!("../src/observed.rs"),
+        include_str!("../src/p1.rs"),
+        include_str!("../src/layout.rs"),
+        include_str!("../src/provider.rs"),
+        include_str!("../src/model.rs"),
+        include_str!("../src/stage_reader.rs"),
+        include_str!("../src/stage.rs"),
     ];
-    let (reached, violations) = audit(&sources, &["observed_css", "observed_sss"]);
+    let (reached, violations) = audit(
+        &sources,
+        &[
+            "observed_css",
+            "observed_sss",
+            "stage_actor_return",
+            "stage_owner_resumed",
+        ],
+    );
     assert!(violations.is_empty(), "{violations:?}");
-    assert_eq!(sources[1].matches("on_screen(screen, object, &view);").count(), 1);
-    for name in ["observe", "grid", "identify", "collect", "read_local_seat", "token", "claimed", "tick", "on_screen"] {
+    assert_eq!(
+        sources[1]
+            .matches("on_screen(screen, object, &view);")
+            .count(),
+        1
+    );
+    for name in [
+        "observe",
+        "grid",
+        "identify",
+        "collect",
+        "read_local_seat",
+        "token",
+        "claimed",
+        "tick",
+        "on_screen",
+        "from_getter",
+        "tab",
+        "qualified_stage",
+    ] {
         assert!(reached.contains(name), "missing owner path to {name}");
     }
 }
