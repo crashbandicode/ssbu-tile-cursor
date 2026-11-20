@@ -31,7 +31,7 @@ impl Layout {
             return None;
         }
         let mut hash = 0xcbf2_9ce4_8422_2325u64;
-        let mut add = |word| {
+        let mut add = |word: u64| {
             hash = (hash ^ word).wrapping_mul(0x100_0000_01b3);
         };
         for word in bounds {
