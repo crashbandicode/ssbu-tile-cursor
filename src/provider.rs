@@ -477,7 +477,7 @@ impl Publisher {
             && s.local_seat == Some(0);
         let sss_grid = active
             && s.screen == Some(Screen::Sss)
-            && s.grid == Some(Layout::Sss)
+            && s.grid.and_then(Layout::stage_count).is_some()
             && s.local_seat == Some(0)
             && (s.stage.is_some() || s.stage_moving);
         let stage = sss_grid.then_some(s.stage).flatten();
@@ -521,6 +521,9 @@ impl Publisher {
                 placed_on.map_or("unknown", Fighter::placed_focus)
             }
             _ if sss_grid && s.stage_moving => "sss.grid.moving",
+            _ if sss_grid && settled && stage.is_some_and(|panel| panel.id().is_none()) => {
+                "sss.grid.random"
+            }
             _ if sss_grid && settled => "sss.grid.normal",
             _ if entry_step && !settled => "css.grid.moving",
             _ => "unknown",
@@ -569,15 +572,16 @@ impl Publisher {
         let _ = write!(
             buf,
             "\nkind={}\nname={}\nform={}",
-            Field(match fighter {
-                Some(fighter) => fighter.id(),
-                None => stage.map(crate::stage::Stage::id),
-            }),
+            Field(
+                fighter
+                    .map(Fighter::id)
+                    .or_else(|| stage.and_then(crate::stage::Stage::id))
+            ),
             Field(
                 fighter
                     .map(|fighter| PublishedName(fighter.name(), true))
                     .or_else(|| stage.map(|stage| PublishedName(stage.name(), false)))
-            ),
+             ),
             Field(
                 fighter
                     .map(|_| "default")
