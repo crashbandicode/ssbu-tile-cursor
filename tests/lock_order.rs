@@ -65,7 +65,7 @@ fn audit(sources: &[&str], roots: &[&str]) -> (BTreeSet<String>, Vec<String>) {
             continue;
         }
         for body in &bodies[&name] {
-            for t in body {
+            for (i, t) in body.iter().enumerate() {
                 if t.starts_with("svc") || t.contains("QueryMemory") || t.ends_with("Mutex") || t.ends_with("Event")
                     || (t == "nn" && name != "tick") || matches!(t.as_str(), "skyline" | "nnsdk" | "std")
                     || matches!(t.as_str(), "lock" | "RwLock" | "Condvar" | "spin_loop" | "yield_now"
@@ -75,7 +75,11 @@ fn audit(sources: &[&str], roots: &[&str]) -> (BTreeSet<String>, Vec<String>) {
                 {
                     violations.push(format!("{name} reaches {t}"));
                 }
-                if bodies.contains_key(t) {
+                // A local such as the vector's `start` is not Worker::start().
+                // Also follow qualified function items passed to Option/iterator callbacks.
+                let called = body.get(i + 1).is_some_and(|n| n == "(" || n == ":");
+                let qualified = i >= 2 && body[i-1] == ":" && body[i-2] == ":";
+                if (called || qualified) && bodies.contains_key(t) {
                     queue.push(t.clone());
                 }
             }
