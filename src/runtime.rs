@@ -441,7 +441,7 @@ unsafe fn stage_actor_return(ctx: &InlineCtx) {
     observed::stage_getter(ctx);
 }
 
-#[skyline::hook(offset = 0x1b29dc0, inline)]
+#[skyline::hook(offset = model::SSS_OBSERVE_OFFSET, inline)]
 unsafe fn stage_owner_resumed(ctx: &InlineCtx) {
     observed::stage_resumed(ctx.registers[19].x());
 }

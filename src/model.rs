@@ -61,6 +61,11 @@ pub const SSS_UPDATE: Site = Site {
     ],
 };
 
+/// Stage Select owner continuation. Both first accessory-button paths join
+/// here after the Lua update, with x19 still holding the live Stage Select
+/// owner. This is outside the Instant Back script-call guard and inline sites.
+pub const SSS_OBSERVE_OFFSET: usize = 0x1b29e10;
+
 /// Inside the hand cursor's update (`.text+0x3786140`, x19 = cursor, x20 =
 /// input context): `mov x0, x20` before `bl 0x3763840`, the stick/D-pad query.
 /// When the query returns zero the rest of the update never reads x20.
