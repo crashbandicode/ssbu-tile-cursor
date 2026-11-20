@@ -118,7 +118,7 @@ pub(super) unsafe fn collect(css: u64, view: &View, sample: &mut Sample) {
         placed_fighter: index.and_then(|i| tile_kind(i, true)),
     };
     sample.p1_token = facts.token();
-    if sample.p1_token == P1Token::Held && view.token == Some(0) {
+    if sample.p1_token == P1Token::Held && view.steppable && view.token == Some(0) {
         sample.fighter = sample
             .hover
             .and_then(|i| tile_kind(i, sample.resting && sample.at == Some(i)));

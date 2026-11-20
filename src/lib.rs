@@ -5,6 +5,8 @@
 //! hand against. Without L3 nothing changes.
 pub mod model;
 #[cfg(any(test, target_os = "switch"))]
+mod layout;
+#[cfg(any(test, target_os = "switch"))]
 mod provider;
 #[cfg(target_os = "switch")]
 mod runtime;

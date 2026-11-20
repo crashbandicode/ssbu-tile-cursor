@@ -426,17 +426,215 @@ fn offline_local_identity_requires_positive_owned_medal_and_direct_seat_zero() {
 fn captured_vectors_reproduce_offline_entry_and_normal_stage_neighbors() {
     use crate::model::{neighbour, Rect};
     let rect = |b: &[u8]| {
-        let f = |i: usize| f32::from_le_bytes(b[i..i+4].try_into().unwrap());
-        Rect { xmin:f(0), xmax:f(4), ymin:f(8), ymax:f(12) }
+        let f = |i: usize| f32::from_le_bytes(b[i..i + 4].try_into().unwrap());
+        Rect {
+            xmin: f(0),
+            xmax: f(4),
+            ymin: f(8),
+            ymax: f(12),
+        }
     };
     let css = include_bytes!("layouts/css.bin");
-    let tiles: Vec<_> = css[16..].chunks_exact(32).map(|r|rect(&r[16..])).collect();
-    let step = neighbour(tiles.as_slice(), (-599.,-236.), Dir::Up, &rect(css));
-    assert_eq!((step.from,step.to,step.target), (None,Some(78),(-576.,-77.)));
+    let tiles: Vec<_> = css[16..].chunks_exact(32).map(|r| rect(&r[16..])).collect();
+    let step = neighbour(tiles.as_slice(), (-599., -236.), Dir::Up, &rect(css));
+    assert_eq!(
+        (step.from, step.to, step.target),
+        (None, Some(78), (-576., -77.))
+    );
     let sss = include_bytes!("layouts/sss.bin");
-    let tiles: Vec<_> = sss[16..].chunks_exact(24).map(|r|rect(&r[8..])).collect();
-    let step = neighbour(tiles.as_slice(), (-189.,358.), Dir::Right, &rect(sss));
-    assert_eq!((step.from,step.to,step.target), (Some(0),Some(1),(-126.,394.)));
+    let tiles: Vec<_> = sss[16..].chunks_exact(24).map(|r| rect(&r[8..])).collect();
+    let step = neighbour(tiles.as_slice(), (-189., 358.), Dir::Right, &rect(sss));
+    assert_eq!(
+        (step.from, step.to, step.target),
+        (Some(0), Some(1), (-126., 394.))
+    );
     let second = neighbour(tiles.as_slice(), step.target, Dir::Right, &rect(sss));
-    assert_eq!(second.to,Some(2));
+    assert_eq!(second.to, Some(2));
+}
+
+#[test]
+fn stock_grid_recognition_rejects_an_in_place_tile_or_clamp_change() {
+    use crate::layout::{supported_css_entry, Layout};
+    for (screen, kinds, bytes, layout) in [
+        (
+            Screen::Css,
+            16usize,
+            include_bytes!("layouts/css.bin").as_slice(),
+            Layout::Css,
+        ),
+        (
+            Screen::Sss,
+            8,
+            include_bytes!("layouts/sss.bin").as_slice(),
+            Layout::Sss,
+        ),
+    ] {
+        let n = (bytes.len() - 16) / (kinds + 16);
+        let identify = |b: &[u8], count| {
+            Layout::identify(screen, count, &b[..16], |i, k, r| {
+                let start = 16 + i * (kinds + 16);
+                &b[start..start + kinds] == k && &b[start + kinds..start + kinds + 16] == r
+            })
+        };
+        assert_eq!(identify(bytes, n), Some(layout));
+        assert_eq!(identify(bytes, n - 1), None);
+        for i in [0, 16, 16 + kinds - 1, bytes.len() - 1] {
+            let mut changed = bytes.to_vec();
+            changed[i] ^= 1;
+            assert_eq!(identify(&changed, n), None);
+        }
+    }
+    assert!(supported_css_entry(
+        Some(Layout::Css),
+        (-599., -236.),
+        None,
+        Some(-1)
+    ));
+    assert!(!supported_css_entry(
+        Some(Layout::Css),
+        (-598., -236.),
+        None,
+        Some(-1)
+    ));
+    assert!(!supported_css_entry(
+        Some(Layout::Css),
+        (-599., -236.),
+        None,
+        Some(-2)
+    ));
+    assert!(!supported_css_entry(
+        Some(Layout::Css),
+        (-599., -236.),
+        Some(78),
+        Some(-1)
+    ));
+}
+
+#[test]
+fn qualified_css_control_has_fresh_entry_held_and_placed_focus() {
+    use crate::layout::Layout;
+    let mut s = Sample {
+        screen: Some(Screen::Css),
+        grid: Some(Layout::Css),
+        local_seat: Some(0),
+        tick: 1,
+        observation: 1,
+        p1_carried: Some(0),
+        p1_token: P1Token::Held,
+        css_entry: true,
+        resting: true,
+        ..Sample::default()
+    };
+    let wire = |s: Sample| block(&mut Publisher::default(), 1, Some(s), true);
+    let entry = wire(s);
+    for row in [
+        "layout=css.9f1fb03bf7c98fb9",
+        "grid=css.9f1fb03bf7c98fb9",
+        "focus=css.grid.entry",
+        "at=none",
+        "hovered=none",
+        "settled=1",
+    ] {
+        assert!(entry.contains(&format!("\n{row}\n")), "{row}");
+    }
+    assert!(entry.ends_with("settled.ack=unknown"));
+    s.resting = false;
+    assert!(wire(s).contains("\nfocus=unknown\n"));
+    s.resting = true;
+    s.css_entry = false;
+    s.at = Some(78);
+    s.hover = Some(78);
+    s.fighter = Some(Fighter::Steve);
+    assert!(wire(s).contains("\nfocus=css.grid.steve\n"));
+    s.at = Some(77);
+    assert!(wire(s).contains("\nfocus=unknown\n"));
+    s.p1_carried = None;
+    s.p1_token = P1Token::Placed;
+    s.hover = None;
+    s.fighter = None;
+    s.p1_placed = Some((78, Fighter::Steve));
+    assert!(wire(s).contains("\nfocus=css.medal.steve\n"));
+    s.local_seat = Some(1);
+    assert!(wire(s).contains("\nfocus=unknown\n"));
+    s.local_seat = Some(0);
+    s.grid = None;
+    assert!(wire(s).contains("\nfocus=unknown\n"));
+    s.screen = Some(Screen::Sss);
+    s.grid = Some(Layout::Sss);
+    let raw = wire(s);
+    assert!(raw.contains("\nlayout=unknown\ngrid=sss.9892b3a32e5c0164\n"));
+    assert!(raw.contains("\nfocus=unknown\n"));
+}
+
+#[test]
+fn takeback_starts_an_idle_action_scope_on_the_same_grid() {
+    let mut s = Sample {
+        screen: Some(Screen::Css),
+        grid: Some(Layout::Css),
+        local_seat: Some(0),
+        generation: 7,
+        observation: 9,
+        tick: 5,
+        p1_token: P1Token::Held,
+        p1_carried: Some(0),
+        resting: true,
+        fighter: Some(Fighter::Steve),
+        at: Some(78),
+        hover: Some(78),
+        ..Sample::default()
+    };
+    s.step.emitted(word(Dir::Up, None, Some(78)));
+    s.step.settled(s.at, s.hover, s.p1_carried);
+    s.step.new_owner();
+    let b = block(&mut Publisher::default(), 5, Some(s), true);
+    for row in [
+        "generation=7",
+        "ack=1",
+        "applied=1",
+        "settled=1",
+        "ack.result=unknown",
+        "direction=unknown",
+    ] {
+        assert!(b.contains(&format!("\n{row}\n")));
+    }
+    assert!(b.ends_with("settled.ack=unknown"));
+}
+
+#[test]
+fn only_the_direct_qualified_entry_step_keeps_tile_focus_while_easing() {
+    let mut s = Sample {
+        screen: Some(Screen::Css),
+        grid: Some(Layout::Css),
+        local_seat: Some(0),
+        generation: 7,
+        observation: 2,
+        tick: 5,
+        p1_token: P1Token::Held,
+        p1_carried: Some(0),
+        hand_steppable: true,
+        ..Sample::default()
+    };
+    s.step.emitted(word(Dir::Up, None, Some(78)));
+    let show = |s: Sample| block(&mut Publisher::default(), 5, Some(s), true);
+    let moving = show(s);
+    for row in [
+        "focus=css.grid.moving",
+        "settled=0",
+        "ack.result=handled",
+        "local.token=held",
+    ] {
+        assert!(moving.contains(&format!("\n{row}\n")));
+    }
+    s.resting = true;
+    s.at = Some(78);
+    s.hover = Some(78);
+    assert!(show(s).contains("\nsettled=0\n"));
+    s.fighter = Some(Fighter::Steve);
+    assert!(show(s).contains("\nfocus=css.grid.steve\n"));
+    s.fighter = None;
+    s.hand_steppable = false;
+    assert!(show(s).contains("\nfocus=unknown\n"));
+    s.hand_steppable = true;
+    s.local_seat = Some(1);
+    assert!(show(s).contains("\nfocus=unknown\n"));
 }

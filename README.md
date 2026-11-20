@@ -75,8 +75,20 @@ slot-zero panel. The qualified default Steve preview is app fighter 88.
 placed identity also requires its native index, tile rectangle and
 committed panel flags to agree. The qualified Training and guest slot assignments report controller 0 and native
 seat 0 or 1 from the direct input objects. Guest movement and local token state
-remain unqualified, and the guest cannot inherit native P1 geometry. The layout
-identifier remains unknown. A stale owner expires after 300 ms.
+remain unqualified, and the guest cannot inherit native P1 geometry. For the captured offline Training CSS, `layout=css.9f1fb03bf7c98fb9`
+requires an exact match of the hand bounds and every tile's ordered primary and
+alternate identity and rectangle. A fresh native P1 hand or committed token
+supplies tile-local focus. The native foreground and input-owner check from
+`ssbu.ui` is also required. The sole qualified below-grid entry is (-599,-236)
+with native hover -1; an Up step reaches default Steve, index 78. See
+[topologies/training-css.json](topologies/training-css.json).
+
+The independent `grid` field identifies a matching native vector. On normal
+Training SSS, `grid=sss.9892b3a32e5c0164` identifies the captured vector and
+clamp. [topologies/training-sss.json](topologies/training-sss.json) records
+the observed rightward edges Training → Battlefield → Small Battlefield.
+Actionable SSS layout, focus, native hover and selection identity remain
+unknown pending active Lua slot and tab qualification. A stale owner expires after 300 ms.
 
 ## Build
 

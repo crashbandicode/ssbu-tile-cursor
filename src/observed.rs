@@ -68,10 +68,24 @@ pub(super) fn stock_build() -> bool {
     }
 }
 
+// The normal-stage preview uses the first typed u64 of the 0x18-stride stage record.
+const SSS_KIND: Site = Site {
+    name: "sss_typed_grid_kind",
+    offset: 0x1b34584,
+    guard: [
+        0x18, 0x69, 0x6a, 0xf8, 0x28, 0xbf, 0x40, 0xf9, 0x00, 0x05, 0x40, 0xf9, 0x94, 0xf7, 0x5d,
+        0x94, 0x1f, 0x9f, 0x40, 0xf2, 0x09, 0x1f, 0x48, 0x92, 0xe8, 0x07, 0x9f, 0x1a, 0x3f, 0x01,
+        0x17, 0xeb, 0xea, 0x17, 0x9f, 0x1a, 0x5a, 0x01, 0x08, 0x0a, 0x08, 0x9c, 0x40, 0x92, 0xda,
+        0x02, 0x00, 0x36, 0x0a, 0x1c, 0x48, 0x92, 0x5f, 0x01, 0x17, 0xeb, 0x04, 0x09, 0x40, 0xfa,
+        0x60, 0x02, 0x00, 0x54,
+    ],
+};
+
 /// Validate optional reader witnesses only after successful bridge registration.
-pub(super) fn p1_mismatch() -> Option<&'static str> {
+pub(super) fn optional_mismatch() -> Option<&'static str> {
     p1::GUARDS
         .iter()
+        .chain(core::iter::once(&SSS_KIND))
         .find(|site| !unsafe { guard_matches(site) })
         .map(|s| s.name)
 }
@@ -141,6 +155,18 @@ impl Worker {
     }
 }
 
+/// Compare stable stock fields directly while the registered owner holds the vector.
+unsafe fn grid(screen: Screen, view: &View) -> Option<crate::layout::Layout> {
+    let bounds =
+        core::slice::from_raw_parts((view.cursor + cursor::BOUNDS as u64) as *const u8, 16);
+    crate::layout::Layout::identify(screen, view.tiles.count, bounds, |i, kinds, rect| {
+        let base = view.tiles.begin + i as u64 * view.tiles.stride;
+        core::slice::from_raw_parts(base as *const u8, kinds.len()) == kinds
+            && core::slice::from_raw_parts((base + view.tiles.rect) as *const u8, rect.len())
+                == rect
+    })
+}
+
 pub(super) unsafe fn observe(screen: Screen, object: u64, view: Option<View>) {
     let owner = &mut *OWNER.0.get();
     let now = tick();
@@ -151,6 +177,7 @@ pub(super) unsafe fn observe(screen: Screen, object: u64, view: Option<View>) {
     };
     let previous_token = owner.latest.p1_carried;
     let previous_seat = owner.latest.local_seat;
+    let previous_grid = owner.latest.grid;
     owner.begin(
         Some((
             screen,
@@ -173,13 +200,15 @@ pub(super) unsafe fn observe(screen: Screen, object: u64, view: Option<View>) {
     sample.at = tile_at(&view.tiles, current).map(|i| i as u16);
     sample.p1_carried = view.token.map(|i| i as u16);
     if sample.p1_carried != previous_token {
-        sample.step.settled_ack = None;
-        sample.step.last_written = 0;
+        // A placed or reacquired token begins a new action scope on the same layout.
+        sample.step.new_owner();
     }
-    sample.hover = view
+    let raw_hover = view
         .records
         .zip(view.token.and_then(model::css::hover_record))
-        .and_then(|(p, off)| usize::try_from(read_i32(p + off as u64)).ok())
+        .map(|(p, off)| read_i32(p + off as u64));
+    sample.hover = raw_hover
+        .and_then(|n| usize::try_from(n).ok())
         .filter(|&i| i < view.tiles.count)
         .map(|i| i as u16);
     // A fresh pair of still owner frames is required even before the first step.
@@ -213,14 +242,19 @@ pub(super) unsafe fn observe(screen: Screen, object: u64, view: Option<View>) {
             _ => {}
         }
     }
+    sample.grid = grid(screen, &view);
     if screen == Screen::Css {
         p1::collect(object, &view, sample);
-        if sample.local_seat != previous_seat {
-            sample.generation += 1;
-            sample.step.new_owner();
-            sample.resting = false;
-            sample.fighter = None;
-        }
+        sample.hand_steppable = view.steppable;
+        sample.css_entry = view.steppable
+            && crate::layout::supported_css_entry(sample.grid, current, sample.at, raw_hover);
+    }
+    if sample.local_seat != previous_seat || sample.grid != previous_grid {
+        sample.generation += 1;
+        sample.step.new_owner();
+        sample.resting = false;
+        sample.fighter = None;
+        sample.css_entry = false;
     }
     MAIL.offer(*sample);
 }

@@ -688,7 +688,7 @@ pub fn main() {
         if !observed::stock_build() {
             let _ = write!(report, " observed_guard=build_id");
             false
-        } else if let Some(site) = observed::p1_mismatch() {
+        } else if let Some(site) = observed::optional_mismatch() {
             let _ = write!(report, " observed_guard={site}");
             false
         } else {

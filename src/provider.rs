@@ -1,5 +1,6 @@
 //! The optional tile.cursor/1 producer. Only the existing writer touches discovery,
 //! serialization and revision tracking. An observed main-thread owner sends values.
+use crate::layout::Layout;
 use crate::model::{Dir, Line, Screen, TICKS_PER_SECOND};
 use core::cell::UnsafeCell;
 use core::fmt::{self, Write};
@@ -240,7 +241,7 @@ impl MedalFacts {
         match (self.carried, self.holding, self.visible, self.grabbed) {
             (0, 1, 1, 1) => P1Token::Held,
             (-1, 0, 1, 0)
-                if self.panel_flags == [1, 1]
+                if self.panel_flags == [0, 1]
                     && self.placed.is_some()
                     && self.rect_matches
                     && self.placed_fighter.is_some() =>
@@ -258,6 +259,9 @@ pub struct Sample {
     pub tick: u64,
     pub generation: u64,
     pub screen: Option<Screen>,
+    pub grid: Option<Layout>,
+    pub css_entry: bool,
+    pub hand_steppable: bool,
     pub at: Option<u16>,
     pub hover: Option<u16>,
     pub p1_carried: Option<u16>,
@@ -285,6 +289,9 @@ impl Owner {
                 tick: 0,
                 generation: 0,
                 screen: None,
+                grid: None,
+                css_entry: false,
+                hand_steppable: false,
                 at: None,
                 hover: None,
                 p1_carried: None,
@@ -427,9 +434,51 @@ impl Publisher {
             (true, Some(_), None) => Endpoint::None,
             _ => Endpoint::Unknown,
         };
-        let settled = p1_view && s.resting && s.at.is_some() && s.at == s.hover;
+        let css_grid = active
+            && s.screen == Some(Screen::Css)
+            && s.grid == Some(Layout::Css)
+            && s.local_seat == Some(0);
+        let entry = css_grid
+            && s.css_entry
+            && s.resting
+            && s.p1_token == P1Token::Held
+            && s.p1_carried == Some(0)
+            && s.at.is_none()
+            && s.hover.is_none();
+        let entry_step = css_grid
+            && s.hand_steppable
+            && s.p1_token == P1Token::Held
+            && s.p1_carried == Some(0)
+            && step.token == Some(0)
+            && step.dir == Some(Dir::Up)
+            && step.from.is_none()
+            && step.to == Some(78)
+            && step.ack > 0
+            && step.last_written == step.ack;
+        let settled = p1_view
+            && s.resting
+            && (s.at.is_some() && s.at == s.hover || entry)
+            && (!entry_step || s.fighter == Some(Fighter::Steve));
+        // Tile-local focus is bound to the released direct hand. The separate ssbu.ui
+        // foreground and input-owner block must authorize any subsequent controller action.
+        let focus = match (css_grid && s.resting, s.p1_token) {
+            (true, P1Token::Held) if entry => "css.grid.entry",
+            (true, P1Token::Held)
+                if settled
+                    && s.at == Some(78)
+                    && s.fighter == Some(Fighter::Steve)
+                    && s.p1_carried == Some(0) =>
+            {
+                "css.grid.steve"
+            }
+            (true, P1Token::Placed) if s.p1_placed == Some((78, Fighter::Steve)) => {
+                "css.medal.steve"
+            }
+            _ if entry_step && !settled => "css.grid.moving",
+            _ => "unknown",
+        };
         let step_still_matches = settled && s.at == step.to && step.token == s.p1_carried;
-        let _ = write!(buf, "schema=tile.cursor/1\nrev={rev}\nboot=0\nack={}\nack.result={result}\nfocus=unknown\nobservation={}\nobservation.active={}", step.ack, s.observation, u8::from(active));
+        let _ = write!(buf, "schema=tile.cursor/1\nrev={rev}\nboot=0\nack={}\nack.result={result}\nfocus={focus}\nobservation={}\nobservation.active={}", step.ack, s.observation, u8::from(active));
         let fighter = p1_view.then_some(s.fighter).flatten();
         let token = if active { s.p1_token } else { P1Token::Unknown };
         let placed = active.then_some(s.p1_placed).flatten();
@@ -443,11 +492,24 @@ impl Publisher {
         };
         let _ = write!(
             buf,
-            "\nscreen={}\ngeneration={}\nlayout=unknown\nat={}\nhovered={}",
+            "\nscreen={}\ngeneration={}\nlayout={}\ngrid={}\nat={}\nhovered={}",
             Field(active.then_some(s.screen).flatten().map(Screen::name)),
             Field(active.then_some(s.generation)),
-            Field(p1_view.then_some(s.at).flatten()),
-            Field(p1_view.then_some(s.hover).flatten())
+            Field(css_grid.then_some(Layout::Css.name())),
+            Field(active.then_some(s.grid).flatten().map(Layout::name)),
+            if entry {
+                Endpoint::None
+            } else {
+                s.at.filter(|_| p1_view)
+                    .map_or(Endpoint::Unknown, Endpoint::Index)
+            },
+            if entry {
+                Endpoint::None
+            } else {
+                s.hover
+                    .filter(|_| p1_view)
+                    .map_or(Endpoint::Unknown, Endpoint::Index)
+            }
         );
         let _ = write!(
             buf,
