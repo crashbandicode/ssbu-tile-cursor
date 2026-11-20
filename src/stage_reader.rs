@@ -1,5 +1,6 @@
 //! Native 13.0.5 stage actor. Any borrowed Lua object is read on its live getter stack.
 use super::*;
+use crate::model::Dir;
 use crate::provider::{P1Token, Sample};
 use crate::stage::{actor_code_matches, qualified_stage, Preview, StageFacts};
 
