@@ -88,6 +88,186 @@ fn generated_table_reproduces_the_captured_stock_layout() {
 }
 
 #[test]
+fn css_table_identifies_every_stock_fighter_tile() {
+    let identify = |index: usize| {
+        let word = CSS_TILES[index].word;
+        fighter_identity(index as u16, word, word, [0, 0], true).expect("stock CSS tile")
+    };
+    for index in 0..CSS_TILES.len() {
+        assert_eq!(identify(index).tile(), index as u16);
+    }
+    for (index, kind, name) in [
+        (0, Some(0), "Mario"),
+        (67, Some(68), "Richter"),
+        (82, Some(93), "Sora"),
+        (78, Some(88), "Steve"),
+        (86, None, "Random"),
+    ] {
+        let fighter = identify(index);
+        assert_eq!(fighter.id(), kind);
+        assert_eq!(fighter.name(), name);
+    }
+    let richter = CSS_TILES[67].word;
+    assert_eq!(
+        fighter_identity(66, richter, richter, [0, 0], true),
+        None
+    );
+    assert_eq!(
+        fighter_identity(67, richter, richter, [1, 0], true),
+        None
+    );
+    assert_eq!(
+        fighter_identity(67, richter, richter, [0, 0], false),
+        None
+    );
+    assert_eq!(
+        fighter_identity(67, richter ^ 1, richter, [0, 0], true),
+        None
+    );
+}
+
+#[test]
+fn publisher_reports_qualified_focus_for_any_settled_fighter() {
+    use crate::layout::Layout;
+
+    let hovered = |index: usize| {
+        block(
+            &mut Publisher::default(),
+            1,
+            Some(Sample {
+                screen: Some(Screen::Css),
+                grid: Some(Layout::Css),
+                local_seat: Some(0),
+                tick: 1,
+                observation: 1,
+                at: Some(index as u16),
+                hover: Some(index as u16),
+                p1_carried: Some(0),
+                p1_token: P1Token::Held,
+                resting: true,
+                fighter: Some(Fighter(index as u16)),
+                ..Sample::default()
+            }),
+            true,
+        )
+    };
+    for (index, focus, kind, name) in [
+        (67, "css.grid.richter", "68", "\"Richter\""),
+        (0, "css.grid.mario", "0", "\"Mario\""),
+        (86, "css.grid.random", "unknown", "\"Random\""),
+        (78, "css.grid.pickel", "88", "\"Steve\""),
+    ] {
+        let body = hovered(index);
+        for row in [
+            format!("focus={focus}"),
+            format!("kind={kind}"),
+            format!("name={name}"),
+            "form=default".to_owned(),
+        ] {
+            assert!(body.contains(&format!("\n{row}\n")), "{row}");
+        }
+    }
+
+    let sora = block(
+        &mut Publisher::default(),
+        1,
+        Some(Sample {
+            screen: Some(Screen::Css),
+            grid: Some(Layout::Css),
+            local_seat: Some(0),
+            tick: 1,
+            observation: 1,
+            at: Some(82),
+            hover: Some(82),
+            p1_carried: None,
+            p1_token: P1Token::Placed,
+            p1_placed: Some((82, Fighter(82))),
+            resting: true,
+            ..Sample::default()
+        }),
+        true,
+    );
+    for row in [
+        "focus=css.medal.trail",
+        "placed.kind=93",
+        "placed.name=\"Sora\"",
+        "p1.placed.kind=93",
+        "p1.placed.name=\"Sora\"",
+    ] {
+        assert!(sora.contains(&format!("\n{row}\n")), "{row}");
+    }
+}
+
+#[test]
+fn every_stock_tile_fits_the_published_block() {
+    use crate::layout::Layout;
+
+    let publish = |sample| {
+        let mut publisher = Publisher::default();
+        let mut sends = 0;
+        let mut bytes = Vec::new();
+        publisher.poll(1, Some(sample), |block| {
+            sends += 1;
+            bytes.extend_from_slice(block);
+            true
+        });
+        (sends, bytes)
+    };
+    for (index, tile) in CSS_TILES.iter().enumerate() {
+        let hover = Sample {
+            screen: Some(Screen::Css),
+            grid: Some(Layout::Css),
+            local_seat: Some(0),
+            tick: 1,
+            observation: 1,
+            at: Some(index as u16),
+            hover: Some(index as u16),
+            p1_carried: Some(0),
+            p1_token: P1Token::Held,
+            resting: true,
+            fighter: Some(Fighter(index as u16)),
+            ..Sample::default()
+        };
+        let (sends, bytes) = publish(hover);
+        let body = String::from_utf8(bytes).unwrap();
+        assert_eq!(sends, 1, "hover tile {index}");
+        assert!(body.len() < 1024, "hover tile {index}");
+        assert!(
+            body.contains(&format!("\nfocus={}\n", tile.hover_focus)),
+            "hover tile {index}"
+        );
+        assert!(
+            body.contains(&format!("\nname=\"{}\"\n", tile.name)),
+            "hover tile {index}"
+        );
+
+        let placed = Sample {
+            p1_carried: None,
+            p1_token: P1Token::Placed,
+            p1_placed: Some((index as u16, Fighter(index as u16))),
+            fighter: None,
+            ..hover
+        };
+        let (sends, bytes) = publish(placed);
+        let body = String::from_utf8(bytes).unwrap();
+        assert_eq!(sends, 1, "placed tile {index}");
+        assert!(body.len() < 1024, "placed tile {index}");
+        assert!(
+            body.contains(&format!("\nfocus={}\n", tile.placed_focus)),
+            "placed tile {index}"
+        );
+        assert!(
+            body.contains(&format!("\np1.placed.name=\"{}\"\n", tile.name)),
+            "placed tile {index}"
+        );
+        assert!(
+            body.contains(&format!("\nplaced.name=\"{}\"\n", tile.name)),
+            "placed tile {index}"
+        );
+    }
+}
+
+#[test]
 fn validates_header_callbacks_and_negative_registration() {
     for field in 0..9 {
         let mut a = api();
@@ -593,7 +773,7 @@ fn qualified_css_control_has_fresh_entry_held_and_placed_focus() {
     s.at = Some(78);
     s.hover = Some(78);
     s.fighter = Some(Fighter(78));
-    assert!(wire(s).contains("\nfocus=css.grid.steve\n"));
+    assert!(wire(s).contains("\nfocus=css.grid.pickel\n"));
     s.at = Some(77);
     assert!(wire(s).contains("\nfocus=unknown\n"));
     s.p1_carried = None;
@@ -601,7 +781,7 @@ fn qualified_css_control_has_fresh_entry_held_and_placed_focus() {
     s.hover = None;
     s.fighter = None;
     s.p1_placed = Some((78, Fighter(78)));
-    assert!(wire(s).contains("\nfocus=css.medal.steve\n"));
+    assert!(wire(s).contains("\nfocus=css.medal.pickel\n"));
     s.local_seat = Some(1);
     assert!(wire(s).contains("\nfocus=unknown\n"));
     s.local_seat = Some(0);
@@ -678,7 +858,7 @@ fn only_the_direct_qualified_entry_step_keeps_tile_focus_while_easing() {
     s.hover = Some(78);
     assert!(show(s).contains("\nsettled=0\n"));
     s.fighter = Some(Fighter(78));
-    assert!(show(s).contains("\nfocus=css.grid.steve\n"));
+    assert!(show(s).contains("\nfocus=css.grid.pickel\n"));
     s.fighter = None;
     s.hand_steppable = false;
     assert!(show(s).contains("\nfocus=unknown\n"));
