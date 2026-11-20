@@ -574,7 +574,7 @@ impl Publisher {
             "\nkind={}\nname={}\nform={}",
             Field(
                 fighter
-                    .map(Fighter::id)
+                    .and_then(Fighter::id)
                     .or_else(|| stage.and_then(crate::stage::Stage::id))
             ),
             Field(
