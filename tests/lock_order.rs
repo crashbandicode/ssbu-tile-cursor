@@ -35,7 +35,16 @@ fn definitions(src: &str, bodies: &mut BTreeMap<String, Vec<Vec<String>>>) {
         if words[i] != "fn" || !matches!(words[i + 2].as_str(), "(" | "<") {
             continue;
         }
-        let Some(start) = (i + 2..words.len()).find(|&j| matches!(words[j].as_str(), "{" | ";"))
+        let mut array_depth = 0;
+        let Some(start) = (i + 2..words.len()).find(|&j| {
+            match words[j].as_str() {
+                "[" => array_depth += 1,
+                "]" => array_depth -= 1,
+                "{" | ";" if array_depth == 0 => return true,
+                _ => (),
+            }
+            false
+        })
         else {
             continue;
         };
@@ -172,7 +181,7 @@ fn lock_order_optional_owners_reach_only_nonblocking_capture() {
 
 #[test]
 fn lock_order_detects_transitive_violations() {
-    let fixture = "fn hook() { inner(); } fn inner() { unsafe { svcQueryMemory(); } cell.lock(); }";
+    let fixture = "fn hook() { inner(); } fn inner(arg: [u64; 2]) { unsafe { svcQueryMemory(); } cell.lock(); }";
     let (_, bad) = audit(&[fixture], &["hook"]);
     assert_eq!(bad, ["inner reaches svcQueryMemory", "inner reaches lock"]);
 }
