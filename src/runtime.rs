@@ -22,6 +22,9 @@ use skyline::nn;
 use std::alloc::{GlobalAlloc, Layout, System};
 use std::sync::atomic::{AtomicU64, Ordering};
 
+#[path = "observed.rs"]
+mod observed;
+
 const DATA_DIR: &str = "sd:/ultimate/ssbu-tile-cursor";
 const EVENT_RING: usize = 64;
 const WRITER_STACK: usize = 16 * 1024;
@@ -237,6 +240,9 @@ unsafe fn hand_cursor(hand: u64) -> Option<(u64, bool)> {
     valid(cursor).then(|| (cursor, read_u8(hand + hand::ENABLED as u64) != 0))
 }
 
+// The accepted release inlines both view builders into its standalone hooks.
+// Keep that codegen when the observed owners introduce a second caller.
+#[inline(always)]
 unsafe fn css_view(css: u64) -> Option<View> {
     use model::css::*;
     let (begin, end) = (
@@ -270,6 +276,7 @@ unsafe fn css_view(css: u64) -> Option<View> {
     })
 }
 
+#[inline(always)]
 unsafe fn sss_view(sss: u64) -> Option<View> {
     use model::sss::*;
     let (cursor, enabled) = hand_cursor(read_u64(sss + HAND as u64))?;
@@ -359,7 +366,7 @@ unsafe fn on_screen(screen: Screen, object: u64, view: &View) {
             );
         }
     }
-    let Some(dir) = state.repeater.update(buttons, now) else {
+    let Some(dir) = state.repeater.update(buttons) else {
         return;
     };
     let bounds_at = view.cursor + cursor::BOUNDS as u64;
@@ -404,6 +411,48 @@ unsafe fn tile_cursor_sss(ctx: &InlineCtx) {
         if let Some(view) = sss_view(sss) {
             on_screen(Screen::Sss, sss, &view);
         }
+    }
+}
+
+/// Alternative owners installed at startup on the same two guarded sites.
+/// The standalone owners and the cursor-query implementation above stay independent.
+#[skyline::hook(offset = model::CSS_PLAYERS_OFFSET, inline)]
+unsafe fn observed_css(ctx: &InlineCtx) {
+    let css = ctx.registers[0].x();
+    observed::observe(
+        Screen::Css,
+        css,
+        valid(css).then(|| css_view(css)).flatten(),
+    );
+}
+
+#[skyline::hook(offset = model::SSS_UPDATE_OFFSET, inline)]
+unsafe fn observed_sss(ctx: &InlineCtx) {
+    let sss = ctx.registers[0].x();
+    observed::observe(
+        Screen::Sss,
+        sss,
+        valid(sss).then(|| sss_view(sss)).flatten(),
+    );
+}
+
+#[skyline::hook(offset = 0x1b3304c, inline)]
+unsafe fn stage_actor_return(ctx: &InlineCtx) {
+    observed::stage_getter(ctx);
+}
+
+#[skyline::hook(offset = model::SSS_OBSERVE_OFFSET, inline)]
+unsafe fn stage_owner_resumed(ctx: &InlineCtx) {
+    observed::stage_resumed(ctx.registers[19].x());
+}
+
+fn install_cursor_hooks(observe: bool) {
+    if observe {
+        observed::prepare_stage();
+        skyline::install_hooks!(observed_css, observed_sss, tile_cursor_query);
+        skyline::install_hooks!(stage_actor_return, stage_owner_resumed);
+    } else {
+        skyline::install_hooks!(tile_cursor_css, tile_cursor_sss, tile_cursor_query);
     }
 }
 
@@ -513,6 +562,7 @@ fn append_log(bytes: &[u8]) {
 
 /// Drains the event ring into `events.log` every 100 ms.
 fn writer_run() -> ! {
+    let mut provider = observed::Worker::start();
     let mut tail = 0u64;
     let mut line = Line::<160>::new();
     loop {
@@ -521,6 +571,7 @@ fn writer_run() -> ! {
                 nanoseconds: 100_000_000,
             })
         };
+        provider.poll();
         let head = EVENT_HEAD.load(Ordering::Acquire);
         if head.saturating_sub(tail) > EVENT_RING as u64 {
             tail = head - EVENT_RING as u64;
@@ -643,12 +694,29 @@ pub fn main() {
         report_install(&mut report);
         return;
     }
-    skyline::install_hooks!(tile_cursor_css, tile_cursor_sss, tile_cursor_query);
+    observed::initialize();
+    let writer = start_writer();
+    let observe = if writer && observed::wait_for_registration() {
+        if !observed::stock_build() {
+            let _ = write!(report, " observed_guard=build_id");
+            false
+        } else if let Some(site) = observed::optional_mismatch() {
+            let _ = write!(report, " observed_guard={site}");
+            false
+        } else {
+            true
+        }
+    } else {
+        false
+    };
+    install_cursor_hooks(observe);
     let _ = write!(report, " hooks=css,sss,cursor_query");
-    // The writer appends to the same log, so it starts only after this line
-    // (and the folder) exist.
+    if observe {
+        let _ = write!(report, " observed=1");
+    }
     report_install(&mut report);
-    if !start_writer() {
+    observed::installation_reported();
+    if !writer {
         report.clear();
         let _ = write!(report, "{} writer=not_started", tick());
         report_install(&mut report);

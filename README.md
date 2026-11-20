@@ -29,7 +29,8 @@ drawn on the clips from the run's own input log.
 
 ## Behaviour
 
-- One step per press; held, it repeats every 250 ms. No wrapping at edges.
+- One step per press. Holding the combination repeats every 15 game frames
+  (250 ms at 60 fps). The cursor stops at the edges.
 - Character select: steps only while the hand carries a token (P1's or a
   CPU's). With an empty hand nothing happens; press B to take the token back.
 - Without L3 the D-pad and stick behave as in the unmodified game. Nothing
@@ -37,22 +38,58 @@ drawn on the clips from the run's own input log.
 
 ## Install
 
-Copy `libssbu_tile_cursor.nro` from the
-[v0.1.0 release](https://git.syntaxbyexample.com/intpa/ssbu-tile-cursor/releases/tag/v0.1.0)
-(the build tested in Eden) to
-`sd:/atmosphere/contents/01006A800016E000/romfs/skyline/plugins/`. It checks
-the game version and every hook site at boot and installs nothing if either
-differs. Each step is logged to `sd:/ultimate/ssbu-tile-cursor/events.log`,
-after the tick:
+Copy the approved `libssbu_tile_cursor.nro` to
+`sd:/atmosphere/contents/01006A800016E000/romfs/skyline/plugins/`. The plugin
+checks 13.0.5 and the native movement sites before installing movement. Its
+optional bridge observations have additional guards. Each step is logged to
+`sd:/ultimate/ssbu-tile-cursor/events.log` after the tick.
 
 ```text
 <tick> step screen=css dir=left from=85 to=84 token=p2 x=288.0 y=-77.0
 <tick> settled screen=css at=84 hovered=84 x=288.0 y=-77.0
 ```
 
-It is a tool for testing in Eden. It has not been tested on a Switch, and
-the Switch card's install records from 2026-10-30 to 2026-11-12 do not list
-it.
+The accepted frame-repeat release `66f00442…` is installed on the Switch card.
+The clips above use the earlier [v0.1.0 release](https://git.syntaxbyexample.com/intpa/ssbu-tile-cursor/releases/tag/v0.1.0).
+
+## Optional bridge state
+
+A compatible bridge can register Tile Cursor as `tile.cursor/1`. The writer
+polls for the export at most once per second for the first 30 seconds. The
+startup hook installer chooses the observed CSS/SSS callbacks only if the
+first poll registered successfully and the full 13.0.5 build note matches. A
+later registration can expose an inactive block. The standalone callbacks
+continue to handle cursor movement when initial registration is absent.
+
+The provider distinguishes movement attempts (`ack`), successful target
+writes (`applied`), and the handled step that reached its native hover
+(`settled.ack`). `p1.carried` is the native slot-zero hand's carried token.
+On CSS, `kind`, `name` and `form` require a settled carried P1 token and
+agreement between its native hover, the default tile identity and the
+slot-zero panel. The qualified default Steve preview is app fighter 88.
+`p1.token` and `p1.placed.*` describe the native seat-zero medal. The
+placed identity also requires its native index, tile rectangle and
+committed panel flags to agree. The qualified Training and guest slot assignments report controller 0 and native
+seat 0 or 1 from the direct input objects. Guest movement and local token state
+remain unqualified, and the guest cannot inherit native P1 geometry. For the captured offline Training CSS, `layout=css.9f1fb03bf7c98fb9`
+requires an exact match of the hand bounds and every tile's ordered primary and
+alternate identity and rectangle. A fresh native P1 hand or committed token
+supplies tile-local focus. The native foreground and input-owner check from
+`ssbu.ui` is also required. The sole qualified below-grid entry is (-599,-236)
+with native hover -1; an Up step reaches default Steve, index 78. See
+[topologies/training-css.json](topologies/training-css.json).
+
+The independent `grid` field identifies a matching native vector. On normal
+Training SSS, `grid=sss.9892b3a32e5c0164` identifies the captured vector and
+clamp. [topologies/training-sss.json](topologies/training-sss.json) records
+the observed rightward edges Training → Battlefield → Small Battlefield.
+On the offline Training route, the active stage actor on the Normal tab must
+agree with its single slot-zero native preview, typed tile, form and the current
+hand. The covered panels are Training, Battlefield and Small Battlefield. An
+acknowledged move can report `sss.grid.moving` until the accepted rest and live
+actor agree again. The runner independently checks the committed Training stage
+scene. An ambiguous medal, another occupied preview slot or a non-Normal form
+clears actionable stage fields. A stale owner expires after 300 ms.
 
 ## Build
 
@@ -61,9 +98,9 @@ cargo test
 cargo skyline build --release
 ```
 
-Since `a052fd5` (2026-10-30) `main` builds as a cdylib only, so the release
-profile's LTO applies. That NRO differs from the release one and has not been
-run in Eden.
+Since `a052fd5` (2026-10-30), `main` builds as a cdylib only so the release
+profile's LTO applies. Match the NRO hash against the receipt when reproducing
+a dated run.
 
 Hook sites: [docs/HOOKS.md](docs/HOOKS.md). Eden test procedure and results:
 [docs/EDEN-TEST.md](docs/EDEN-TEST.md), [docs/EDEN-RESULTS.md](docs/EDEN-RESULTS.md).

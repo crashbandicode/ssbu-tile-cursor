@@ -1,0 +1,28 @@
+{
+  "layout": "sss.9892b3a32e5c0164",
+  "neighbors": {
+    "0": {
+      "right": "1"
+    },
+    "1": {
+      "right": "2"
+    }
+  },
+  "targets": {
+    "0": {
+      "kind": "308",
+      "name": "Training",
+      "form": "normal"
+    },
+    "1": {
+      "kind": "0",
+      "name": "Battlefield",
+      "form": "normal"
+    },
+    "2": {
+      "kind": "347",
+      "name": "Small Battlefield",
+      "form": "normal"
+    }
+  }
+}

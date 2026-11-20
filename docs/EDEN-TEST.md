@@ -89,8 +89,8 @@ positions in the game's tile vector: consecutive within a row on the CSS.
    The first `to` is in the row above, and the second returns to the previous
    tile's index.
 
-7. **Held repeat.** Run `press lstick,left 1100`. Expect 5 `step` lines (at
-   about 0, 250, 500, 750 and 1000 ms, so tick gaps of about 4.8 M), each with
+7. **Held repeat (frame-based).** Hold L3 + Left for 61 game frames with a
+   macro. Expect 5 `step` lines (at held frames 0, 15, 30, 45 and 60), each with
    `to` one less than the line before, until the row starts (`to=none`).
    Whether a held step gets its own `settled` line depends on the frame rate:
    at 60 fps the hand settles in about 8 frames, before the next repeat. A step
