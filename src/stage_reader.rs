@@ -1,8 +1,7 @@
 //! Native 13.0.5 stage actor. Any borrowed Lua object is read on its live getter stack.
 use super::*;
-use crate::model::Dir;
 use crate::provider::{P1Token, Sample};
-use crate::stage::{actor_code_matches, qualified_stage, Preview, StageFacts};
+use crate::stage::{actor_code_matches, qualified_stage, start_move, Preview, StageFacts};
 
 const INVALID_KIND: u64 = 0x69ff_ff00_0000_0000;
 const KEYS: [&[u8]; 3] = [b"get_tab_switch", b"TAB_SWITCH_NORMAL", b"TAB_SWITCH_SUB"];
@@ -207,18 +206,11 @@ pub(super) unsafe fn begin(owner: u64, view: &View, sample: &Sample) -> bool {
     if lua == 0 {
         return false;
     }
-    if let (Some((generation, previous, from)), Some(to)) = (s.last_rest, sample.step.to) {
-        if sample.step.ack == previous + 1
-            && sample.step.last_written == sample.step.ack
-            && sample.step.from == Some(from)
-            && generation == sample.generation
-            && matches!(
-                (from, to, sample.step.dir),
-                (0, 1, Some(Dir::Right)) | (1, 2, Some(Dir::Right)) | (2, 1, Some(Dir::Left))
-            )
-        {
-            s.moving = Some((generation, sample.step.ack, from, to));
-        }
+    if let Some(movement) = s
+        .last_rest
+        .and_then(|rest| start_move(rest, sample.generation, sample.step))
+    {
+        s.moving = Some(movement);
     }
     true
 }

@@ -1,4 +1,25 @@
 //! Qualified local Training stage preview for the one native hand and slot.
+use crate::model::Dir;
+use crate::provider::Step;
+
+pub fn start_move(
+    rest: (u64, u64, u16),
+    generation: u64,
+    step: Step,
+) -> Option<(u64, u64, u16, u16)> {
+    let (rest_generation, previous, from) = rest;
+    let to = step.to?;
+    (step.ack == previous + 1
+        && step.last_written == step.ack
+        && step.from == Some(from)
+        && rest_generation == generation
+        && matches!(
+            (from, to, step.dir),
+            (0, 1, Some(Dir::Right)) | (1, 2, Some(Dir::Right)) | (2, 1, Some(Dir::Left))
+        ))
+    .then_some((generation, step.ack, from, to))
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Stage {
     Training,
