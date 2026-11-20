@@ -183,6 +183,8 @@ pub fn local_seat(rows: &[SeatInput]) -> Option<u8> {
     }
 }
 
+/// A qualified stock CSS tile, as its index into the generated `CSS_TILES`. The index, its typed tile word, the
+/// current panel preview and the default variant are checked before exposing the tile's app fighter kind.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct Fighter(u16);
 
@@ -221,7 +223,7 @@ pub fn fighter_identity(
         && CSS_TILES
             .get(usize::from(index))
             .is_some_and(|record| record.word == tile)
-        && index == 78)
+    )
         .then_some(Fighter(index))
 }
 
@@ -503,21 +505,20 @@ impl Publisher {
             && (s.screen != Some(Screen::Sss) || stage.is_some());
         // Tile-local focus is bound to the released direct hand. The separate ssbu.ui
         // foreground and input-owner block must authorize any subsequent controller action.
+        let hovered = s.fighter.filter(|f| s.at == Some(f.tile()));
+        let placed_on = s
+            .p1_placed
+            .filter(|&(i, f)| f.tile() == i)
+            .map(|(_, f)| f);
         let focus = match (css_grid && s.resting, s.p1_token) {
             (true, P1Token::Held) if entry => "css.grid.entry",
             (true, P1Token::Held)
-                if settled
-                    && s.at == Some(78)
-                    && s.fighter.map(Fighter::tile) == Some(78)
-                    && s.p1_carried == Some(0) =>
+                if settled && s.p1_carried == Some(0) && hovered.is_some() =>
             {
-                "css.grid.steve"
+                hovered.map_or("unknown", Fighter::hover_focus)
             }
-            (true, P1Token::Placed)
-                if s.p1_placed
-                    .is_some_and(|(index, fighter)| index == 78 && fighter.tile() == index) =>
-            {
-                "css.medal.steve"
+            (true, P1Token::Placed) if placed_on.is_some() => {
+                placed_on.map_or("unknown", Fighter::placed_focus)
             }
             _ if sss_grid && s.stage_moving => "sss.grid.moving",
             _ if sss_grid && settled => "sss.grid.normal",
