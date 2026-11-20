@@ -85,9 +85,10 @@ clamp. [topologies/training-sss.json](topologies/training-sss.json) records
 the observed rightward edges Training → Battlefield → Small Battlefield.
 On the offline Training route, the active stage actor on the Normal tab must
 agree with its single slot-zero native preview, typed tile, form and the current
-hand. The covered panels are Training, Battlefield and Small Battlefield. An
-acknowledged move can report `sss.grid.moving` until the accepted rest and live
-actor agree again. The runner independently checks the committed Training stage
+hand. The covered panels are Training, Battlefield, Small Battlefield, Big
+Battlefield and Final Destination. From a qualified rest, the next applied
+step can report `sss.grid.moving` until the hand and live actor agree on the
+settled tile. The runner independently checks the committed Training stage
 scene. An ambiguous medal, another occupied preview slot or a non-Normal form
 clears actionable stage fields. A stale owner expires after 300 ms.
 

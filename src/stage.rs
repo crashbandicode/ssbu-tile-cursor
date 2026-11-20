@@ -1,7 +1,8 @@
 //! Qualified local Training stage preview for the one native hand and slot.
-use crate::model::Dir;
 use crate::provider::Step;
 
+/// Start from a qualified rest and the next local step emitted after its target write.
+/// The owner checks that target and the native preview again after Lua resumes.
 pub fn start_move(
     rest: (u64, u64, u16),
     generation: u64,
@@ -13,10 +14,8 @@ pub fn start_move(
         && step.last_written == step.ack
         && step.from == Some(from)
         && rest_generation == generation
-        && matches!(
-            (from, to, step.dir),
-            (0, 1, Some(Dir::Right)) | (1, 2, Some(Dir::Right)) | (2, 1, Some(Dir::Left))
-        ))
+        && to != from
+        && step.dir.is_some())
     .then_some((generation, step.ack, from, to))
 }
 
@@ -25,6 +24,8 @@ pub enum Stage {
     Training,
     Battlefield,
     SmallBattlefield,
+    BigBattlefield,
+    FinalDestination,
 }
 
 impl Stage {
@@ -33,6 +34,8 @@ impl Stage {
             Self::Training => 308,
             Self::Battlefield => 0,
             Self::SmallBattlefield => 347,
+            Self::BigBattlefield => 2,
+            Self::FinalDestination => 3,
         }
     }
     pub fn name(self) -> &'static str {
@@ -40,6 +43,8 @@ impl Stage {
             Self::Training => "Training",
             Self::Battlefield => "Battlefield",
             Self::SmallBattlefield => "Small Battlefield",
+            Self::BigBattlefield => "Big Battlefield",
+            Self::FinalDestination => "Final Destination",
         }
     }
 }
@@ -92,6 +97,8 @@ pub fn qualified_stage(s: StageFacts) -> Option<Stage> {
         (0, 0x6900_6d11_6b90_4091) => Some(Stage::Training),
         (1, 0x6900_0415_4b5c_4392) => Some(Stage::Battlefield),
         (2, 0x6900_8817_1954_c00c) => Some(Stage::SmallBattlefield),
+        (3, 0x6900_0517_945c_cdf9) => Some(Stage::BigBattlefield),
+        (4, 0x6900_060c_40bf_5050) => Some(Stage::FinalDestination),
         _ => None,
     }
 }
