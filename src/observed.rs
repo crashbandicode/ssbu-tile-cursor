@@ -199,6 +199,7 @@ pub(super) unsafe fn observe(screen: Screen, object: u64, view: Option<View>) {
     let owner = &mut *OWNER.0.get();
     let now = tick();
     let Some(view) = view else {
+        pad_gap();
         owner.begin(None, now);
         MAIL.offer(owner.latest);
         return;
@@ -256,7 +257,10 @@ pub(super) unsafe fn observe(screen: Screen, object: u64, view: Option<View>) {
         let code = slot.code.load(Ordering::Relaxed) as u8;
         match code {
             EV_STEP => sample.step.emitted(slot.a.load(Ordering::Relaxed)),
-            EV_BLOCKED => sample.step.blocked += 1,
+            EV_BLOCKED => {
+                let presses = slot.a.load(Ordering::Relaxed) >> 16 & 0xff;
+                sample.step.blocked = sample.step.blocked.saturating_add(presses);
+            }
             EV_SETTLED => {
                 let record = slot.a.load(Ordering::Relaxed);
                 // Require the original settle_token's native hover AND today's

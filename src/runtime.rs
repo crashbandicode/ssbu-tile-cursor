@@ -12,7 +12,7 @@
 //! allocations (expected 0) in the log.
 use crate::model::{
     self, cursor, describe, hand, input, neighbour, pack_blocked, pack_screen, pack_settled,
-    pack_step, tile_at, Line, PadTracker, RawEvent, Rect, Repeater, Screen, Site, Tiles, BUTTON_L3,
+    pack_step, tile_at, Line, PadInput, PadOutcome, RawEvent, Rect, Screen, Site, Tiles, BUTTON_L3,
     EV_BLOCKED, EV_SCREEN, EV_SETTLED, EV_STEP, PAD_RING, TICKS_PER_SECOND,
 };
 use core::cell::UnsafeCell;
@@ -98,10 +98,7 @@ static PAD_GC: AtomicU64 = AtomicU64::new(0);
 
 /// State only the two screen hooks touch; both run on the game's main thread.
 struct GameState {
-    repeater: Repeater,
-    blocked: Repeater,
-    pad: PadTracker,
-    pad_source: Option<(u32, u32)>,
+    input: PadInput,
     screen: Option<(Screen, u64)>,
     /// The cursor whose step is waiting to settle, settled frames seen, and
     /// the token slot the hand carried for that step (CSS).
@@ -113,10 +110,7 @@ struct Shared(UnsafeCell<GameState>);
 // SAFETY: accessed only from the screen hooks, which run on one thread.
 unsafe impl Sync for Shared {}
 static STATE: Shared = Shared(UnsafeCell::new(GameState {
-    repeater: Repeater::new(),
-    blocked: Repeater::new(),
-    pad: PadTracker::new(),
-    pad_source: None,
+    input: PadInput::new(),
     screen: None,
     settle_cursor: 0,
     settle_frames: 0,
@@ -342,7 +336,7 @@ fn resolve_pad_ring() {
     }
 }
 
-fn p1_ring() -> Option<((u32, u32), [(i64, u64); PAD_RING])> {
+fn p1_ring() -> Option<((u32, u32), [(i64, u64); PAD_RING], usize)> {
     unsafe fn style(id: u32) -> Option<u32> {
         let flags = nn::hid::GetNpadStyleSet(&id).flags;
         if flags & STYLE_GC != 0 {
@@ -374,26 +368,35 @@ fn p1_ring() -> Option<((u32, u32), [(i64, u64); PAD_RING])> {
         return None;
     }
     let mut ring = [(0, 0); PAD_RING];
-    unsafe {
+    let count = unsafe {
         if selected == STYLE_GC {
-            let get: unsafe extern "C" fn(*mut nn::hid::NpadGcState, i32, *const u32) =
+            let get: unsafe extern "C" fn(*mut nn::hid::NpadGcState, i32, *const u32) -> i32 =
                 core::mem::transmute(address);
             let mut states = [nn::hid::NpadGcState::default(); PAD_RING];
-            get(states.as_mut_ptr(), PAD_RING as i32, &id);
-            for (out, sample) in ring.iter_mut().zip(states) {
+            let count = get(states.as_mut_ptr(), PAD_RING as i32, &id).clamp(0, PAD_RING as i32) as usize;
+            for (out, sample) in ring.iter_mut().zip(states).take(count) {
                 *out = (sample.updateCount, sample.Buttons);
             }
+            count
         } else {
-            let get: unsafe extern "C" fn(*mut nn::hid::NpadHandheldState, i32, *const u32) =
+            let get: unsafe extern "C" fn(*mut nn::hid::NpadHandheldState, i32, *const u32) -> i32 =
                 core::mem::transmute(address);
             let mut states = [nn::hid::NpadHandheldState::default(); PAD_RING];
-            get(states.as_mut_ptr(), PAD_RING as i32, &id);
-            for (out, sample) in ring.iter_mut().zip(states) {
+            let count = get(states.as_mut_ptr(), PAD_RING as i32, &id).clamp(0, PAD_RING as i32) as usize;
+            for (out, sample) in ring.iter_mut().zip(states).take(count) {
                 *out = (sample.updateCount, sample.Buttons);
             }
+            count
         }
+    };
+    if count == 0 {
+        return None;
     }
-    Some(((id, selected), ring))
+    Some(((id, selected), ring, count))
+}
+
+pub(super) unsafe fn pad_gap() {
+    (*STATE.0.get()).input.gap();
 }
 
 unsafe fn on_screen(screen: Screen, object: u64, view: &View) {
@@ -401,10 +404,7 @@ unsafe fn on_screen(screen: Screen, object: u64, view: &View) {
     let now = tick();
     if state.screen != Some((screen, object)) {
         state.screen = Some((screen, object));
-        state.repeater = Repeater::new();
-        state.blocked = Repeater::new();
-        state.pad.reset();
-        state.pad_source = None;
+        state.input.gap();
         state.settle_cursor = 0;
         push_event(
             EV_SCREEN,
@@ -422,34 +422,13 @@ unsafe fn on_screen(screen: Screen, object: u64, view: &View) {
     } else {
         LIVE_UNTIL.store(0, Ordering::Relaxed);
     }
-    let mut batch = [(0, 0); PAD_RING];
-    let count = if let Some((source, ring)) = p1_ring() {
-        if state.pad_source != Some(source) {
-            state.pad.reset();
-            state.pad_source = Some(source);
-        }
-        state.pad.unseen(&ring, &mut batch)
-    } else {
-        state.pad.reset();
-        state.pad_source = None;
-        batch[0] = (0, p1_buttons());
-        1
-    };
-    let mut buttons = [0; PAD_RING];
-    for (out, &(_, value)) in buttons.iter_mut().zip(&batch[..count]) {
-        *out = value;
-    }
-    let (dir, used) = if view.steppable {
-        state.blocked = Repeater::new();
-        state.repeater.feed(&buttons[..count])
-    } else {
-        state.repeater = Repeater::new();
-        state.blocked.feed(&buttons[..count])
-    };
-    state.pad.consume(&batch[..count], used);
-    if state.pad_source.is_none() {
-        state.pad.reset();
-    }
+    let ring = p1_ring();
+    let outcome = state.input.frame(
+        (screen, object, view.cursor),
+        view.steppable,
+        ring.as_ref().map(|(source, samples, count)| (*source, &samples[..*count])),
+        p1_buttons,
+    );
     let current = read_point(view.cursor + cursor::CURRENT as u64);
     let target = read_point(view.cursor + cursor::TARGET as u64);
     if state.settle_cursor == view.cursor {
@@ -473,13 +452,14 @@ unsafe fn on_screen(screen: Screen, object: u64, view: &View) {
             );
         }
     }
-    let Some(dir) = dir else {
-        return;
+    let dir = match outcome {
+        PadOutcome::None => return,
+        PadOutcome::Blocked { dir, presses } => {
+            push_event(EV_BLOCKED, pack_blocked(screen, dir, presses));
+            return;
+        }
+        PadOutcome::Step(dir) => dir,
     };
-    if !view.steppable {
-        push_event(EV_BLOCKED, pack_blocked(screen, dir));
-        return;
-    }
     let bounds_at = view.cursor + cursor::BOUNDS as u64;
     let bounds = Rect {
         xmin: read_f32(bounds_at),
@@ -511,8 +491,10 @@ unsafe fn tile_cursor_css(ctx: &InlineCtx) {
     if valid(css) {
         if let Some(view) = css_view(css) {
             on_screen(Screen::Css, css, &view);
+            return;
         }
     }
+    pad_gap();
 }
 
 #[skyline::hook(offset = model::SSS_UPDATE_OFFSET, inline)]
@@ -521,8 +503,10 @@ unsafe fn tile_cursor_sss(ctx: &InlineCtx) {
     if valid(sss) {
         if let Some(view) = sss_view(sss) {
             on_screen(Screen::Sss, sss, &view);
+            return;
         }
     }
+    pad_gap();
 }
 
 /// Alternative owners installed at startup on the same two guarded sites.

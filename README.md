@@ -31,9 +31,10 @@ drawn on the clips from the run's own input log.
 
 - One step per press. Holding the combination repeats every 15 game frames
   (250 ms at 60 fps). The cursor stops at the edges.
-- The pad's recent samples are read so a chord shorter than the gap between
-  two updates still steps once. A chord pressed while the hand may not step is
-  logged as `blocked` and counted in `blocked=`.
+- Recent pad samples are replayed only between consecutive updates where the
+  same hand could step, so a chord shorter than the gap between those updates
+  still steps once. A chord pressed while the hand may not step is logged as
+  `blocked … presses=<n>` and counted in `blocked=`.
 - Character select: steps only while the hand carries a token (P1's or a
   CPU's). With an empty hand nothing happens; press B to take the token back.
 - Without L3 the D-pad and stick behave as in the unmodified game. Nothing
@@ -67,6 +68,8 @@ continue to handle cursor movement when initial registration is absent.
 The provider distinguishes movement attempts (`ack`), blocked chords (`blocked`), successful target
 writes (`applied`), and the handled step that reached its native hover
 (`settled.ack`). `p1.carried` is the native slot-zero hand's carried token.
+An L3 + direction that cannot move logs `step … to=none` and publishes
+`result=edge` with `ack` advanced and `applied` unchanged.
 `phase` is `unknown`, `moving`, `resting` or `settled`. `target.at`,
 `target.kind` and `target.name` identify the tile at the native target point
 and its stock identity, not the live preview.

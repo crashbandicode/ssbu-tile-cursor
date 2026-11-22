@@ -432,6 +432,127 @@ impl PadTracker {
     }
 }
 
+pub type PadOwner = (Screen, u64, u64);
+pub type PadSource = (u32, u32);
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum PadOutcome {
+    None,
+    Step(Dir),
+    Blocked { dir: Dir, presses: u8 },
+}
+
+#[derive(Clone, Copy, Eq, PartialEq)]
+enum Prev {
+    Gap,
+    Steppable,
+    Blocked,
+}
+
+pub struct PadInput {
+    owner: Option<PadOwner>,
+    source: Option<PadSource>,
+    prev: Prev,
+    tracker: PadTracker,
+    steps: Repeater,
+    blocked: Repeater,
+}
+
+impl Default for PadInput {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl PadInput {
+    pub const fn new() -> Self {
+        Self {
+            owner: None,
+            source: None,
+            prev: Prev::Gap,
+            tracker: PadTracker::new(),
+            steps: Repeater::new(),
+            blocked: Repeater::new(),
+        }
+    }
+
+    pub fn gap(&mut self) {
+        *self = Self::new();
+    }
+
+    pub fn frame(
+        &mut self,
+        owner: PadOwner,
+        steppable: bool,
+        ring: Option<(PadSource, &[(i64, u64)])>,
+        newest: impl FnOnce() -> u64,
+    ) -> PadOutcome {
+        let ring = ring.filter(|(_, samples)| !samples.is_empty());
+        if self.owner != Some(owner) {
+            self.gap();
+            self.owner = Some(owner);
+        }
+        let history = ring.is_some_and(|(source, _)| {
+            self.source == Some(source) && self.tracker.last.is_some() && self.prev != Prev::Gap
+        });
+        if ring.is_some_and(|(source, _)| self.source != Some(source)) {
+            self.steps = Repeater::new();
+        }
+        let mut batch = [(0, 0); PAD_RING];
+        let count = if let Some((source, samples)) = ring {
+            self.source = Some(source);
+            if history && (!steppable || self.prev == Prev::Steppable) {
+                self.tracker.unseen(samples, &mut batch)
+            } else {
+                batch[0] = samples[0];
+                1
+            }
+        } else {
+            self.tracker.reset();
+            self.source = None;
+            batch[0] = (0, newest());
+            1
+        };
+        let mut buttons = [0; PAD_RING];
+        for (out, &(_, value)) in buttons.iter_mut().zip(&batch[..count]) {
+            *out = value;
+        }
+        if steppable {
+            self.blocked = Repeater::new();
+            if self.prev != Prev::Steppable {
+                self.steps = Repeater::new();
+            }
+            let (dir, used) = self.steps.feed(&buttons[..count]);
+            if ring.is_some() {
+                self.tracker.consume(&batch[..count], used);
+            }
+            self.prev = Prev::Steppable;
+            dir.map_or(PadOutcome::None, PadOutcome::Step)
+        } else {
+            self.steps = Repeater::new();
+            let mut offset = 0;
+            let mut presses: u8 = 0;
+            let mut last = None;
+            loop {
+                let (dir, used) = self.blocked.feed(&buttons[offset..count]);
+                if let Some(dir) = dir {
+                    last = Some(dir);
+                    presses = presses.saturating_add(1);
+                }
+                offset += used;
+                if offset == count {
+                    break;
+                }
+            }
+            if let Some((_, samples)) = ring {
+                self.tracker.consume(&samples[..1], 1);
+            }
+            self.prev = Prev::Blocked;
+            last.map_or(PadOutcome::None, |dir| PadOutcome::Blocked { dir, presses })
+        }
+    }
+}
+
 /// A tile rectangle in layout units.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct Rect {
@@ -703,8 +824,8 @@ pub fn pack_step(screen: Screen, dir: Dir, step: &Step, token: Option<usize>) ->
     )
 }
 
-pub fn pack_blocked(screen: Screen, dir: Dir) -> (u64, u64) {
-    (screen.code() | u64::from(dir.code()) << 8, 0)
+pub fn pack_blocked(screen: Screen, dir: Dir, presses: u8) -> (u64, u64) {
+    (screen.code() | u64::from(dir.code()) << 8 | u64::from(presses) << 16, 0)
 }
 
 /// ` token=p<n>` for a carried token's slot (`p1` = P1's own); nothing when
@@ -760,7 +881,7 @@ pub fn describe(event: &RawEvent, out: &mut impl fmt::Write) -> fmt::Result {
         }
         EV_BLOCKED => {
             let dir = Dir::from_code((a >> 8) as u8).map_or("unknown", Dir::name);
-            write!(out, "blocked screen={screen} dir={dir}")
+            write!(out, "blocked screen={screen} dir={dir} presses={}", (a >> 16) as u8)
         }
         EV_SETTLED => {
             let (x, y) = unpack_point(b);
