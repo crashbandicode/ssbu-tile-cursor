@@ -907,9 +907,9 @@ pub fn describe(event: &RawEvent, out: &mut impl fmt::Write) -> fmt::Result {
             let total: u16 = counts.iter().map(|&count| u16::from(count)).sum();
             if directions == 1 {
                 let index = counts.iter().position(|&count| count != 0).unwrap();
-                write!(out, "blocked screen={screen} dir={} presses={total}", Dir::ALL[index].name())
+                write!(out, "blocked screen={screen} dir={} presses={total}", Dir::ALL[index].name()) // restriction: TC-BLOCKED-LOG (logs an existing rule; adds no restriction)
             } else {
-                write!(out, "blocked screen={screen} dir=mixed presses={total}")?;
+                write!(out, "blocked screen={screen} dir=mixed presses={total}")?; // restriction: TC-BLOCKED-LOG (logs an existing rule; adds no restriction)
                 for (dir, count) in Dir::ALL.into_iter().zip(counts) {
                     if count != 0 {
                         write!(out, " {}={count}", dir.name())?;
