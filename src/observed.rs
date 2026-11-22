@@ -299,13 +299,7 @@ pub(super) unsafe fn observe(screen: Screen, object: u64, view: Option<View>) {
         sample.css_entry = view.steppable
             && crate::layout::supported_css_entry(sample.grid, current, sample.at, raw_hover);
     }
-    if screen == Screen::Css && sample.local_seat != previous_seat || sample.grid != previous_grid {
-        sample.generation += 1;
-        sample.step.new_owner();
-        sample.resting = false;
-        sample.fighter = None;
-        sample.css_entry = false;
-    }
+    sample.rebind(screen, previous_seat, previous_grid);
     if screen == Screen::Sss {
         sample.hand_steppable = view.steppable;
         if stage_reader::begin(object, &view, sample) {

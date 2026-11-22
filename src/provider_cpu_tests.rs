@@ -43,6 +43,37 @@ fn sample() -> Sample {
     }
 }
 
+#[test]
+fn a_seat_or_layout_change_unpublishes_the_carried_fighter() {
+    // What collect leaves for a held coin on a settled hover (p1.rs: P1's coin, then the CPU's).
+    let p1_held = Sample {
+        p1_carried: Some(0), p1_token: P1Token::Held, p1_placed: None, p1_coin: P1Token::Held, p1_coin_at: None,
+        at: Some(67), hover: Some(67), fighter: Some(Fighter(67)), carried_fighter: Some(Fighter(67)),
+        hand_token: HandToken::Unknown, hand_steppable: true, ..sample()
+    };
+    let cpu_held = Sample {
+        p1_carried: Some(1), p1_token: P1Token::Unknown, p1_placed: None, cpu_token: P1Token::Held,
+        cpu_placed: None, at: Some(67), hover: Some(67), carried_fighter: Some(Fighter(67)),
+        hand_token: HandToken::Unknown, hand_steppable: true, ..sample()
+    };
+    for held in [p1_held, cpu_held] {
+        lines(&wire(held), &["settled=1", "carried.kind=68", "carried.name=\"Richter\"", "carried.form=default"]);
+        let mut same = held;
+        same.rebind(Screen::Css, Some(0), Some(Layout::Css));
+        assert_eq!(same, held, "an unchanged seat and layout invalidate nothing");
+        // The seat only now became recognisable as local seat 0; the layout changed.
+        for (seat, grid) in [(None, Some(Layout::Css)), (Some(0), None)] {
+            let mut changed = held;
+            changed.rebind(Screen::Css, seat, grid);
+            assert_eq!(changed.generation, held.generation + 1);
+            lines(&wire(changed), &[
+                "settled=0", "kind=unknown", "name=unknown", "form=unknown",
+                "carried.kind=unknown", "carried.name=unknown", "carried.form=unknown",
+            ]);
+        }
+    }
+}
+
 fn measured_facts() -> CoinFacts {
     CoinFacts {
         flags: [1, 1, 1, 1, 1, 0, 0, 0],

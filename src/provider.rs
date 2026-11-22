@@ -360,6 +360,20 @@ pub struct Sample {
     pub step: Step,
 }
 
+impl Sample {
+    /// A changed local seat (fighter select) or a changed layout begins a new generation and action scope:
+    /// nothing read against the old hover stays published.
+    pub fn rebind(&mut self, screen: Screen, previous_seat: Option<u8>, previous_grid: Option<Layout>) {
+        if screen == Screen::Css && self.local_seat != previous_seat || self.grid != previous_grid {
+            self.generation += 1;
+            self.step.new_owner();
+            self.resting = false;
+            self.fighter = None;
+            self.css_entry = false;
+        }
+    }
+}
+
 #[derive(Default)]
 pub struct Owner {
     /// Used only on the owner thread, for identity comparison, never dereferenced later.
