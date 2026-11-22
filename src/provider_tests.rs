@@ -765,7 +765,7 @@ fn qualified_css_control_has_fresh_entry_held_and_placed_focus() {
     ] {
         assert!(entry.contains(&format!("\n{row}\n")), "{row}");
     }
-    assert!(entry.ends_with("settled.ack=unknown"));
+    assert_eq!(entry.lines().nth(37), Some("settled.ack=unknown"));
     s.resting = false;
     assert!(wire(s).contains("\nfocus=unknown\n"));
     s.resting = true;
@@ -825,7 +825,7 @@ fn takeback_starts_an_idle_action_scope_on_the_same_grid() {
     ] {
         assert!(b.contains(&format!("\n{row}\n")));
     }
-    assert!(b.ends_with("settled.ack=unknown"));
+    assert_eq!(b.lines().nth(37), Some("settled.ack=unknown"));
 }
 
 #[test]
@@ -967,5 +967,278 @@ fn stage_wire_preserves_idle_and_ties_a_settled_pick_to_its_own_step() {
         "settled.ack=unknown",
     ] {
         assert!(has(&lost, s), "{s}");
+    }
+}
+
+#[test]
+fn css_mid_move_has_a_reliable_phase() {
+    let sample = Sample {
+        screen: Some(Screen::Css),
+        grid: Some(Layout::Css),
+        local_seat: Some(0),
+        tick: 1,
+        observation: 1,
+        hand_steppable: true,
+        p1_token: P1Token::Held,
+        p1_carried: Some(0),
+        at: Some(67),
+        hover: None,
+        resting: false,
+        fighter: None,
+        step: Step {
+            ack: 11,
+            applied: 11,
+            dir: Some(Dir::Up),
+            from: Some(78),
+            to: Some(67),
+            token: Some(0),
+            last_written: 11,
+            settled_ack: None,
+        },
+        ..Sample::default()
+    };
+    let actual = block(&mut Publisher::default(), 1, Some(sample), true);
+    for line in ["focus=unknown", "hovered=unknown", "settled=0", "from=78", "to=67"] {
+        assert!(actual.lines().any(|got| got == line), "missing {line}: {actual}");
+    }
+    assert!(actual.lines().any(|got| got == "phase=moving"), "{actual}");
+}
+
+fn css_reliability_sample(ack: u64) -> Sample {
+    Sample {
+        screen: Some(Screen::Css),
+        grid: Some(Layout::Css),
+        local_seat: Some(0),
+        tick: 1,
+        observation: 3316,
+        generation: 21,
+        hand_steppable: true,
+        p1_token: P1Token::Held,
+        p1_carried: Some(0),
+        at: Some(67),
+        target: Some(67),
+        step: Step {
+            ack,
+            applied: ack,
+            dir: Some(Dir::Up),
+            from: Some(78),
+            to: Some(67),
+            token: Some(0),
+            last_written: ack,
+            settled_ack: None,
+        },
+        ..Sample::default()
+    }
+}
+
+fn assert_lines(actual: &str, lines: &[&str]) {
+    for line in lines {
+        assert!(actual.lines().any(|got| got == *line), "missing {line}: {actual}");
+    }
+}
+
+#[test]
+fn css_state_move_preserves_captured_legacy_and_publishes_target() {
+    let actual = block(&mut Publisher::default(), 1, Some(css_reliability_sample(11)), true);
+    let expected = [
+        "schema=tile.cursor/1", "rev=1", "boot=0", "ack=11", "ack.result=handled",
+        "focus=unknown", "observation=3316", "observation.active=1", "screen=css",
+        "generation=21", "layout=css.9f1fb03bf7c98fb9", "grid=css.9f1fb03bf7c98fb9",
+        "at=67", "hovered=unknown", "kind=unknown", "name=unknown", "form=unknown",
+        "controller=0", "seat=0", "carried=0", "p1.carried=0", "p1.token=held",
+        "p1.placed.at=unknown", "p1.placed.kind=unknown", "p1.placed.name=unknown",
+        "p1.placed.form=unknown", "local.token=held", "placed.at=unknown",
+        "placed.kind=unknown", "placed.name=unknown", "placed.form=unknown",
+        "settled=0", "applied=11", "direction=up", "from=78", "to=67",
+        "result=handled", "settled.ack=unknown",
+    ];
+    assert_eq!(actual.lines().take(38).collect::<Vec<_>>(), expected);
+    assert_lines(&actual, &[
+        "phase=moving", "target.at=67", "target.kind=68", "target.name=\"Richter\"",
+    ]);
+    println!("T1-BEGIN\n{actual}\nT1-END");
+}
+
+#[test]
+fn css_state_resting_waits_for_qualified_fighter_identity() {
+    let sample = Sample {
+        observation: 4785,
+        generation: 28,
+        resting: true,
+        hover: Some(67),
+        step: Step { settled_ack: Some(24), ..css_reliability_sample(24).step },
+        ..css_reliability_sample(24)
+    };
+    let actual = block(&mut Publisher::default(), 1, Some(sample), true);
+    let expected = [
+        "schema=tile.cursor/1", "rev=1", "boot=0", "ack=24", "ack.result=handled",
+        "focus=unknown", "observation=4785", "observation.active=1", "screen=css",
+        "generation=28", "layout=css.9f1fb03bf7c98fb9", "grid=css.9f1fb03bf7c98fb9",
+        "at=67", "hovered=67", "kind=unknown", "name=unknown", "form=unknown",
+        "controller=0", "seat=0", "carried=0", "p1.carried=0", "p1.token=held",
+        "p1.placed.at=unknown", "p1.placed.kind=unknown", "p1.placed.name=unknown",
+        "p1.placed.form=unknown", "local.token=held", "placed.at=unknown",
+        "placed.kind=unknown", "placed.name=unknown", "placed.form=unknown",
+        "settled=1", "applied=24", "direction=up", "from=78", "to=67",
+        "result=handled", "settled.ack=24",
+    ];
+    assert_eq!(actual.lines().take(38).collect::<Vec<_>>(), expected);
+    assert_lines(&actual, &[
+        "phase=resting", "target.at=67", "target.kind=68", "target.name=\"Richter\"",
+    ]);
+    println!("T2-BEGIN\n{actual}\nT2-END");
+}
+
+#[test]
+fn css_qualified_fighter_is_settled_with_stock_target() {
+    let sample = Sample {
+        resting: true,
+        hover: Some(67),
+        fighter: Some(Fighter(67)),
+        ..css_reliability_sample(11)
+    };
+    let actual = block(&mut Publisher::default(), 1, Some(sample), true);
+    assert_lines(&actual, &[
+        "focus=css.grid.richter", "kind=68", "name=\"Richter\"", "phase=settled",
+        "target.at=67", "target.kind=68", "target.name=\"Richter\"",
+    ]);
+}
+
+#[test]
+fn ordinary_random_targets_survive_move_and_unqualified_arrival() {
+    use crate::stage::Stage;
+    for (panel, name, stage) in [
+        (1, "Random Battlefield", Stage::RandomBattlefield),
+        (2, "Random Omega", Stage::RandomOmega),
+    ] {
+        let moving = Sample {
+            screen: Some(Screen::Sss),
+            grid: Some(Layout::OrdinarySss),
+            local_seat: Some(0),
+            tick: 1,
+            observation: 1,
+            stage_moving: true,
+            at: Some(0),
+            target: Some(panel),
+            p1_token: P1Token::Held,
+            p1_carried: Some(0),
+            ..Sample::default()
+        };
+        let wire = |s| block(&mut Publisher::default(), 1, Some(s), true);
+        let target = [
+            format!("target.at={panel}"), "target.kind=unknown".into(), format!("target.name={name}"),
+        ];
+        let check = |body: &str| {
+            for line in &target {
+                assert!(body.lines().any(|got| got == line), "{line}: {body}");
+            }
+        };
+        let flight = wire(moving);
+        assert_lines(&flight, &["focus=sss.grid.moving", "phase=moving"]);
+        check(&flight);
+        let arrival = Sample {
+            at: Some(panel), hover: Some(panel), resting: true, stage_moving: false,
+            local_seat: None, ..moving
+        };
+        let waiting = wire(arrival);
+        assert_lines(&waiting, &["focus=unknown", "layout=unknown", "settled=0", "phase=resting"]);
+        check(&waiting);
+        let qualified = wire(Sample {
+            local_seat: Some(0), stage: Some(stage), ..arrival
+        });
+        assert_lines(&qualified, &["settled=1", "phase=settled"]);
+        check(&qualified);
+    }
+}
+
+#[test]
+fn training_stage_target_and_out_of_table_target_are_bounded() {
+    use crate::stage::Stage;
+    let sample = Sample {
+        screen: Some(Screen::Sss), grid: Some(Layout::Sss), local_seat: Some(0),
+        tick: 1, observation: 1, resting: true, at: Some(0), hover: Some(0),
+        stage: Some(Stage::Training), target: Some(1), ..Sample::default()
+    };
+    let wire = |s| block(&mut Publisher::default(), 1, Some(s), true);
+    assert_lines(&wire(sample), &[
+        "phase=settled", "target.at=1", "target.kind=0", "target.name=Battlefield",
+    ]);
+    assert_lines(&wire(Sample { target: Some(20), ..sample }), &[
+        "phase=settled", "target.at=20", "target.kind=unknown", "target.name=unknown",
+    ]);
+}
+
+#[test]
+fn cpu_coin_and_css_entry_do_not_require_fighter_identity() {
+    let wire = |s| block(&mut Publisher::default(), 1, Some(s), true);
+    let cpu = Sample {
+        resting: true, at: Some(67), hover: Some(67), p1_carried: Some(1),
+        p1_token: P1Token::Placed, fighter: None, ..css_reliability_sample(11)
+    };
+    assert_lines(&wire(cpu), &[
+        "phase=settled", "target.at=67", "target.kind=68", "target.name=\"Richter\"",
+    ]);
+    let entry = Sample {
+        resting: true, css_entry: true, at: None, hover: None, target: None,
+        step: Step::default(), ..css_reliability_sample(11)
+    };
+    assert_lines(&wire(entry), &[
+        "focus=css.grid.entry", "phase=settled", "target.at=none",
+        "target.kind=unknown", "target.name=unknown",
+    ]);
+}
+
+#[test]
+fn stale_no_screen_and_guest_have_unknown_phase_and_target() {
+    let sample = css_reliability_sample(11);
+    for (now, s) in [
+        (MAX_AGE + 2, sample),
+        (1, Sample { screen: None, ..sample }),
+        (1, Sample { local_seat: Some(1), ..sample }),
+    ] {
+        let actual = block(&mut Publisher::default(), now, Some(s), true);
+        assert_lines(&actual, &[
+            "phase=unknown", "target.at=unknown", "target.kind=unknown", "target.name=unknown",
+        ]);
+    }
+}
+
+#[test]
+fn appended_state_keys_preserve_legacy_order() {
+    let actual = block(&mut Publisher::default(), 1, Some(css_reliability_sample(11)), true);
+    let keys: Vec<_> = actual.lines().map(|line| line.split_once('=').unwrap().0).collect();
+    assert_eq!(keys, [
+        "schema", "rev", "boot", "ack", "ack.result", "focus", "observation",
+        "observation.active", "screen", "generation", "layout", "grid", "at", "hovered",
+        "kind", "name", "form", "controller", "seat", "carried", "p1.carried", "p1.token",
+        "p1.placed.at", "p1.placed.kind", "p1.placed.name", "p1.placed.form", "local.token",
+        "placed.at", "placed.kind", "placed.name", "placed.form", "settled", "applied",
+        "direction", "from", "to", "result", "settled.ack", "phase", "target.at",
+        "target.kind", "target.name",
+    ]);
+}
+
+#[test]
+fn all_css_stock_targets_fit_worst_case_legacy_content() {
+    let longest = CSS_TILES.iter().enumerate().max_by_key(|(_, tile)| tile.name.len()).unwrap().0 as u16;
+    for target in 0..CSS_TILES.len() as u16 {
+        for (token, carried) in [(P1Token::Held, Some(0)), (P1Token::Placed, None)] {
+            let sample = Sample {
+                screen: Some(Screen::Css), grid: Some(Layout::Css), local_seat: Some(0),
+                tick: 1, observation: u64::MAX, generation: u64::MAX,
+                resting: true, at: Some(longest), hover: Some(longest), target: Some(target),
+                fighter: Some(Fighter(longest)), p1_token: token, p1_carried: carried,
+                p1_placed: Some((longest, Fighter(longest))),
+                step: Step {
+                    ack: u64::MAX, applied: u64::MAX, last_written: u64::MAX,
+                    dir: Some(Dir::Right), from: Some(u16::MAX), to: Some(longest),
+                    token: carried, settled_ack: Some(u64::MAX),
+                },
+                ..Sample::default()
+            };
+            let actual = block(&mut Publisher::default(), 1, Some(sample), true);
+            assert!(!actual.is_empty(), "no publication for target {target} and {token:?}");
+            assert!(actual.len() < 1024, "target {target} and {token:?}: {}", actual.len());
+        }
     }
 }

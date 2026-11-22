@@ -268,3 +268,33 @@ fn ordinary_random_controls_and_normal_stages_follow_typed_right_steps() {
         }
     }
 }
+
+#[test]
+fn stock_stage_matches_every_qualified_stock_panel() {
+    use crate::layout::Layout;
+    use crate::stage::stock_stage;
+
+    for (layout, panel, kind, form, stage) in [
+        (Layout::OrdinarySss, 0, 0x6900_0116_6fbc_7641, 0, Stage::RandomNormal),
+        (Layout::OrdinarySss, 1, 0x6900_021c_23e8_aab5, 1, Stage::RandomBattlefield),
+        (Layout::OrdinarySss, 2, 0x6900_0313_bb95_239c, 2, Stage::RandomOmega),
+        (Layout::OrdinarySss, 3, 0x6900_0415_4b5c_4392, 0, Stage::Battlefield),
+        (Layout::OrdinarySss, 4, 0x6900_8817_1954_c00c, 0, Stage::SmallBattlefield),
+        (Layout::OrdinarySss, 5, 0x6900_0517_945c_cdf9, 0, Stage::BigBattlefield),
+        (Layout::OrdinarySss, 6, 0x6900_060c_40bf_5050, 0, Stage::FinalDestination),
+        (Layout::Sss, 0, 0x6900_6d11_6b90_4091, 0, Stage::Training),
+        (Layout::Sss, 1, 0x6900_0415_4b5c_4392, 0, Stage::Battlefield),
+        (Layout::Sss, 2, 0x6900_8817_1954_c00c, 0, Stage::SmallBattlefield),
+        (Layout::Sss, 3, 0x6900_0517_945c_cdf9, 0, Stage::BigBattlefield),
+        (Layout::Sss, 4, 0x6900_060c_40bf_5050, 0, Stage::FinalDestination),
+    ] {
+        let mut sample = facts(TRAINING, panel, kind);
+        sample.layout = layout;
+        sample.records[0] = Preview { kind, panel, form };
+        assert_eq!(stock_stage(layout, panel as u16), Some(stage));
+        assert_eq!(qualified_stage(sample), Some(stage));
+    }
+    for (layout, panel) in [(Layout::Css, 0), (Layout::Sss, 5), (Layout::OrdinarySss, 7)] {
+        assert_eq!(stock_stage(layout, panel), None);
+    }
+}
