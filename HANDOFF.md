@@ -85,6 +85,7 @@ Under `smash-training-lobby/artifacts/phase23/`:
 
 ## Known limits
 
+- A seat or layout change clears `carried.*` in the same block.
 - `events.log` is written through a 64-event ring and can drop lines; the state counters `ack`, `applied` and
   `blocked` are the record.
 - A chord that is no longer among the 16 newest samples at the next update is not seen. In te4 and te5 Eden

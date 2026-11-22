@@ -369,6 +369,7 @@ impl Sample {
             self.step.new_owner();
             self.resting = false;
             self.fighter = None;
+            self.carried_fighter = None;
             self.css_entry = false;
         }
     }

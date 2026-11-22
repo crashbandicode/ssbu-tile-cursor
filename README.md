@@ -108,6 +108,7 @@ After the existing 43 lines, `hand.token` reports the coin the game points
 at for a resting empty hand; `p1.coin` / `p1.coin.at` report P1's own coin
 independently of the hand, and `cpu.token` / `cpu.placed.*` report the CPU
 coin. `carried.*` identifies the qualified fighter under either carried coin.
+A seat or layout change clears `carried.*` in the same block.
 `target.token` and `token.settled` identify and confirm an empty-hand token
 step. An edge advances `ack` without `applied`. When both coins overlap, the
 game may point at P1's coin instead; `token.settled` reflects that decision.

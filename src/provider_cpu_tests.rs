@@ -74,6 +74,112 @@ fn a_seat_or_layout_change_unpublishes_the_carried_fighter() {
     }
 }
 
+// CPU held and placed-on-fighter states are P1 analogies, not scm1 measurements.
+fn cpu_pick_samples() -> Vec<(&'static str, Sample)> {
+    let step = |dir, from, to| crate::model::pack_step(
+        Screen::Css, dir, &crate::model::Step { from: Some(from), to: Some(to), target: (0.0, 0.0) }, Some(1)).0;
+    let rest = Sample {
+        observation: 6000, generation: 28, at: Some(45), target: Some(45),
+        p1_placed: Some((0, Fighter(0))), p1_coin_at: Some(0), hand_token: HandToken::None,
+        step: Step { ack: 13, applied: 13, ..Step::default() },
+        ..sample()
+    };
+    let mut reach = rest.step;
+    reach.token_emitted(pack_token(Screen::Css, Dir::Left, Some(45), Some(86), Some(1), (576.0, -77.0)).0);
+    let reach_moving = Sample { observation: 6003, at: None, target: Some(86), resting: false, step: reach, ..rest };
+    let reach_settled = Sample {
+        observation: 6020, at: Some(86), target: Some(86), hand_token: HandToken::Slot(1), step: reach, ..rest
+    };
+    let mut scope = reach;
+    scope.new_owner(); // observed.rs: a picked-up coin begins a new action scope
+    let held = Sample {
+        observation: 6030, at: Some(86), target: Some(86), hover: Some(86), p1_carried: Some(1),
+        p1_token: P1Token::Unknown, p1_placed: None, hand_token: HandToken::Unknown,
+        cpu_token: P1Token::Held, cpu_placed: None, carried_fighter: Some(Fighter(86)),
+        hand_steppable: true, step: scope, ..rest
+    };
+    let held_moving = Sample { observation: 6028, hover: None, carried_fighter: None, resting: false, ..held };
+    let mut left = scope;
+    left.emitted(step(Dir::Left, 86, 85));
+    let step1_moving = Sample {
+        observation: 6033, at: Some(85), target: Some(85), hover: None, carried_fighter: None, resting: false,
+        step: left, ..held
+    };
+    let mut left_done = left;
+    left_done.settled(Some(85), Some(85), Some(1));
+    let step1_settled = Sample {
+        observation: 6045, at: Some(85), target: Some(85), hover: Some(85), carried_fighter: Some(Fighter(85)),
+        step: left_done, ..held
+    };
+    let mut up = left_done;
+    up.emitted(step(Dir::Up, 85, 74));
+    let step2_moving = Sample {
+        observation: 6050, at: Some(74), target: Some(74), hover: None, carried_fighter: None, resting: false,
+        step: up, ..held
+    };
+    let mut up_done = up;
+    up_done.settled(Some(74), Some(74), Some(1));
+    let step2_settled = Sample {
+        observation: 6062, at: Some(74), target: Some(74), hover: Some(74), carried_fighter: Some(Fighter(74)),
+        step: up_done, ..held
+    };
+    let mut after = up_done;
+    after.new_owner();
+    // The hand is modelled back over the banner, as after P1's placement.
+    let placed = Sample { observation: 6080, cpu_placed: Some((74, Fighter(74))), step: after, ..rest };
+    // Producer-shaped faults for the runner's refusals.
+    let wrong_coin = Sample {
+        observation: 6030, at: Some(0), target: Some(0), hover: Some(0), p1_carried: Some(0),
+        p1_token: P1Token::Held, p1_placed: None, p1_coin: P1Token::Held, p1_coin_at: None,
+        fighter: Some(Fighter(0)), carried_fighter: Some(Fighter(0)), hand_token: HandToken::Unknown,
+        hand_steppable: true, step: scope, ..rest
+    };
+    let p1_moved = Sample { p1_coin_at: Some(1), ..step1_settled };
+    // The step was written to 85 but the hand settled on 84: `settled=1`, no `settled.ack`.
+    let unacknowledged = Sample {
+        observation: 6045, at: Some(84), target: Some(84), hover: Some(84), carried_fighter: Some(Fighter(84)),
+        step: left, ..held
+    };
+    vec![
+        ("rest", rest), ("reach-moving", reach_moving), ("reach-settled", reach_settled),
+        ("held-moving", held_moving), ("held", held), ("step1-moving", step1_moving),
+        ("step1-settled", step1_settled), ("step2-moving", step2_moving), ("step2-settled", step2_settled),
+        ("placed", placed), ("wrong-coin", wrong_coin), ("p1-moved", p1_moved), ("unacknowledged", unacknowledged),
+    ]
+}
+
+#[test]
+fn the_cpu_pick_wire_fixture_is_current() {
+    let samples = cpu_pick_samples();
+    let block = |name| wire(samples.iter().find(|(n, _)| *n == name).unwrap().1);
+    lines(&block("held"), &[
+        "focus=unknown", "kind=unknown", "settled=1", "at=86", "hovered=86", "settled.ack=unknown",
+        "ack.result=unknown", "direction=unknown", "carried=unknown", "p1.carried=1", "local.token=unknown",
+        "cpu.token=held", "p1.coin=placed", "p1.coin.at=0", "carried.kind=unknown", "carried.name=\"Random\"",
+        "carried.form=default", "hand.token=unknown", "ack=14", "applied=14",
+    ]);
+    lines(&block("step1-settled"), &[
+        "focus=unknown", "kind=unknown", "settled=1", "at=85", "hovered=85", "ack=15", "applied=15",
+        "settled.ack=15", "direction=left", "from=86", "to=85", "carried.kind=74", "carried.name=\"Mii Gunner\"",
+    ]);
+    lines(&block("step1-moving"), &[
+        "settled=0", "hovered=unknown", "settled.ack=unknown", "carried.kind=unknown",
+    ]);
+    lines(&block("reach-settled"), &[
+        "hand.token=1", "target.token=1", "token.settled=1", "local.token=placed", "carried=none",
+    ]);
+    lines(&block("placed"), &[
+        "cpu.token=placed", "cpu.placed.at=74", "cpu.placed.kind=84", "cpu.placed.name=\"Banjo & Kazooie\"",
+        "local.token=placed", "placed.at=0", "placed.kind=0", "carried=none", "settled.ack=unknown",
+        "direction=unknown", "ack=16", "applied=16",
+    ]);
+    lines(&block("unacknowledged"), &[
+        "settled=1", "at=84", "hovered=84", "settled.ack=unknown", "direction=left", "to=85",
+    ]);
+    let generated: String = samples.into_iter().map(|(name, sample)| format!("### {name}\n{}\n\n", wire(sample))).collect();
+    assert_eq!(generated, include_str!("cpu-pick-wire.txt"), "generated fixture:\n{generated}");
+}
+
 fn measured_facts() -> CoinFacts {
     CoinFacts {
         flags: [1, 1, 1, 1, 1, 0, 0, 0],
