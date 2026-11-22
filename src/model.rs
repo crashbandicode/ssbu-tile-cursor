@@ -348,6 +348,13 @@ pub struct Repeater {
     remaining: u8,
 }
 
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct Scan {
+    pub first: Option<Dir>,
+    pub later: [u8; 4],
+    pub repeat: Option<Dir>,
+}
+
 impl Repeater {
     pub const fn new() -> Self {
         Self {
@@ -358,11 +365,13 @@ impl Repeater {
 
     /// Called exactly once per CSS/SSS frame by the screen hook.
     pub fn update(&mut self, buttons: u64) -> Option<Dir> {
-        self.feed(&[buttons]).0
+        let scan = self.scan(&[buttons]);
+        scan.first.or(scan.repeat)
     }
 
-    pub fn feed(&mut self, samples: &[u64]) -> (Option<Dir>, usize) {
-        for (index, &buttons) in samples.iter().enumerate() {
+    pub fn scan(&mut self, samples: &[u64]) -> Scan {
+        let mut scan = Scan::default();
+        for &buttons in samples {
             let dir = if buttons & BUTTON_L3 != 0 {
                 Dir::from_buttons(buttons)
             } else {
@@ -371,19 +380,24 @@ impl Repeater {
             if dir != self.held {
                 self.held = dir;
                 self.remaining = REPEAT_FRAMES;
-                if dir.is_some() {
-                    return (dir, index + 1);
+                if let Some(dir) = dir {
+                    if scan.first.is_none() {
+                        scan.first = Some(dir);
+                    } else {
+                        let count = &mut scan.later[dir as usize];
+                        *count = count.saturating_add(1);
+                    }
                 }
             }
         }
-        if self.held.is_some() {
+        if scan.first.is_none() && self.held.is_some() {
             self.remaining -= 1;
             if self.remaining == 0 {
                 self.remaining = REPEAT_FRAMES;
-                return (self.held, samples.len());
+                scan.repeat = self.held;
             }
         }
-        (None, samples.len())
+        scan
     }
 }
 
@@ -435,11 +449,10 @@ impl PadTracker {
 pub type PadOwner = (Screen, u64, u64);
 pub type PadSource = (u32, u32);
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum PadOutcome {
-    None,
-    Step(Dir),
-    Blocked { dir: Dir, presses: u8 },
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct PadFrame {
+    pub step: Option<Dir>,
+    pub blocked: [u8; 4],
 }
 
 #[derive(Clone, Copy, Eq, PartialEq)]
@@ -451,10 +464,14 @@ enum Prev {
 
 /// The sample ring only ever adds samples that arrived between two consecutive
 /// steppable callbacks of the same hand (screen, picker object, cursor) on
-/// the same pad source. In every other situation the step decision is exactly
-/// the pre-ring one: one `Repeater` update with the newest sample when the hand
-/// may step, a released repeater when it may not, and a full reset only when
-/// the screen or picker object changes.
+/// the same pad source. Each update examines every sample it takes exactly once,
+/// in that update, and every press among them gets exactly one outcome in that
+/// same update. The first press of an update in which the hand may step is the
+/// step. Every other press is counted as blocked: the hand may not step, or
+/// this update already stepped. Nothing is carried to a later update. A hold
+/// frame is counted at most once per update, and only in an update that brought
+/// no press, so a hold repeat comes 15 updates after its press for steps and
+/// for blocked alike.
 pub struct PadInput {
     owner: Option<PadOwner>,
     source: Option<PadSource>,
@@ -497,7 +514,7 @@ impl PadInput {
         steppable: bool,
         ring: Option<(PadSource, &[(i64, u64)])>,
         newest: impl FnOnce() -> u64,
-    ) -> PadOutcome {
+    ) -> PadFrame {
         let ring = ring.filter(|(_, samples)| !samples.is_empty());
         if self.owner.map(|(screen, object, _)| (screen, object)) != Some((owner.0, owner.1)) {
             self.reset();
@@ -527,36 +544,26 @@ impl PadInput {
         for (out, &(_, value)) in buttons.iter_mut().zip(&batch[..count]) {
             *out = value;
         }
-        if steppable {
+        let frame = if steppable {
             self.blocked = Repeater::new();
-            let (dir, used) = self.steps.feed(&buttons[..count]);
-            if ring.is_some() {
-                self.tracker.consume(&batch[..count], used);
-            }
+            let scan = self.steps.scan(&buttons[..count]);
             self.prev = Prev::Steppable;
-            dir.map_or(PadOutcome::None, PadOutcome::Step)
+            PadFrame { step: scan.first.or(scan.repeat), blocked: scan.later }
         } else {
             self.steps = Repeater::new();
-            let mut offset = 0;
-            let mut presses: u8 = 0;
-            let mut last = None;
-            loop {
-                let (dir, used) = self.blocked.feed(&buttons[offset..count]);
-                if let Some(dir) = dir {
-                    last = Some(dir);
-                    presses = presses.saturating_add(1);
-                }
-                offset += used;
-                if offset == count {
-                    break;
-                }
-            }
-            if let Some((_, samples)) = ring {
-                self.tracker.consume(&samples[..1], 1);
+            let scan = self.blocked.scan(&buttons[..count]);
+            let mut counts = scan.later;
+            for dir in [scan.first, scan.repeat].into_iter().flatten() {
+                let count = &mut counts[dir as usize];
+                *count = count.saturating_add(1);
             }
             self.prev = Prev::Blocked;
-            last.map_or(PadOutcome::None, |dir| PadOutcome::Blocked { dir, presses })
+            PadFrame { step: None, blocked: counts }
+        };
+        if ring.is_some() {
+            self.tracker.consume(&batch[..count], count);
         }
+        frame
     }
 }
 
@@ -831,8 +838,16 @@ pub fn pack_step(screen: Screen, dir: Dir, step: &Step, token: Option<usize>) ->
     )
 }
 
-pub fn pack_blocked(screen: Screen, dir: Dir, presses: u8) -> (u64, u64) {
-    (screen.code() | u64::from(dir.code()) << 8 | u64::from(presses) << 16, 0)
+pub fn pack_blocked(screen: Screen, counts: [u8; 4]) -> (u64, u64) {
+    let mut value = screen.code();
+    for (index, count) in counts.into_iter().enumerate() {
+        value |= u64::from(count) << (8 * (index + 1));
+    }
+    (value, 0)
+}
+
+pub fn unpack_blocked(value: u64) -> [u8; 4] {
+    [(value >> 8) as u8, (value >> 16) as u8, (value >> 24) as u8, (value >> 32) as u8]
 }
 
 /// ` token=p<n>` for a carried token's slot (`p1` = P1's own); nothing when
@@ -887,8 +902,21 @@ pub fn describe(event: &RawEvent, out: &mut impl fmt::Write) -> fmt::Result {
             )
         }
         EV_BLOCKED => {
-            let dir = Dir::from_code((a >> 8) as u8).map_or("unknown", Dir::name);
-            write!(out, "blocked screen={screen} dir={dir} presses={}", (a >> 16) as u8)
+            let counts = unpack_blocked(a);
+            let directions = counts.iter().filter(|&&count| count != 0).count();
+            let total: u16 = counts.iter().map(|&count| u16::from(count)).sum();
+            if directions == 1 {
+                let index = counts.iter().position(|&count| count != 0).unwrap();
+                write!(out, "blocked screen={screen} dir={} presses={total}", Dir::ALL[index].name())
+            } else {
+                write!(out, "blocked screen={screen} dir=mixed presses={total}")?;
+                for (dir, count) in Dir::ALL.into_iter().zip(counts) {
+                    if count != 0 {
+                        write!(out, " {}={count}", dir.name())?;
+                    }
+                }
+                Ok(())
+            }
         }
         EV_SETTLED => {
             let (x, y) = unpack_point(b);

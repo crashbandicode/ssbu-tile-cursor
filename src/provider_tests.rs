@@ -1262,7 +1262,7 @@ fn blocked_counter_is_appended_and_survives_owner_changes() {
 
 #[test]
 fn an_up_at_the_top_row_edge_always_logs_to_none() {
-    use crate::model::{describe, neighbour, tile_at, Line, PadInput, PadOutcome, RawEvent, Rect,
+    use crate::model::{describe, neighbour, tile_at, Line, PadFrame, PadInput, RawEvent, Rect,
                        BUTTON_L3, BUTTON_UP, EV_STEP};
 
     let css = include_bytes!("layouts/css.bin");
@@ -1297,8 +1297,10 @@ fn an_up_at_the_top_row_edge_always_logs_to_none() {
     let chord = BUTTON_L3 | BUTTON_UP;
 
     let mut live = PadInput::new();
-    let live_dir = match live.frame(owner, true, Some((source, &[(200, chord)])), || 0) {
-        PadOutcome::Step(dir) => dir,
+    let live_frame = live.frame(owner, true, Some((source, &[(200, chord)])), || 0);
+    assert_eq!(live_frame.blocked, [0; 4]);
+    let live_dir = match live_frame.step {
+        Some(dir) => dir,
         other => panic!("expected live-chord step, got {other:?}"),
     };
     assert_eq!(event(live_dir).1, expected);
@@ -1311,11 +1313,15 @@ fn an_up_at_the_top_row_edge_always_logs_to_none() {
         input.frame(owner, true, Some((source, &b)), || 0),
         input.frame(owner, true, Some((source, &b)), || 0),
     ];
-    assert_eq!(outcomes, [PadOutcome::None, PadOutcome::Step(Dir::Up), PadOutcome::None]);
-    let events: Vec<_> = outcomes.into_iter().filter_map(|outcome| match outcome {
-        PadOutcome::Step(dir) => Some(event(dir)),
-        _ => None,
-    }).collect();
+    for frame in &outcomes {
+        assert_eq!(frame.blocked, [0; 4]);
+    }
+    assert_eq!(outcomes, [
+        PadFrame { step: None, blocked: [0; 4] },
+        PadFrame { step: Some(Dir::Up), blocked: [0; 4] },
+        PadFrame { step: None, blocked: [0; 4] },
+    ]);
+    let events: Vec<_> = outcomes.into_iter().filter_map(|frame| frame.step.map(event)).collect();
     assert_eq!(events.len(), 1, "expected one top-edge step log");
     assert_eq!(events[0].1, expected);
 

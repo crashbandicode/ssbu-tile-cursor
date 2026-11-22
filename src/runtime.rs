@@ -12,7 +12,7 @@
 //! allocations (expected 0) in the log.
 use crate::model::{
     self, cursor, describe, hand, input, neighbour, pack_blocked, pack_screen, pack_settled,
-    pack_step, tile_at, Line, PadInput, PadOutcome, RawEvent, Rect, Screen, Site, Tiles, BUTTON_L3,
+    pack_step, tile_at, Line, PadInput, RawEvent, Rect, Screen, Site, Tiles, BUTTON_L3,
     EV_BLOCKED, EV_SCREEN, EV_SETTLED, EV_STEP, PAD_RING, TICKS_PER_SECOND,
 };
 use core::cell::UnsafeCell;
@@ -423,7 +423,7 @@ unsafe fn on_screen(screen: Screen, object: u64, view: &View) {
         LIVE_UNTIL.store(0, Ordering::Relaxed);
     }
     let ring = p1_ring();
-    let outcome = state.input.frame(
+    let frame = state.input.frame(
         (screen, object, view.cursor),
         view.steppable,
         ring.as_ref().map(|(source, samples, count)| (*source, &samples[..*count])),
@@ -452,37 +452,34 @@ unsafe fn on_screen(screen: Screen, object: u64, view: &View) {
             );
         }
     }
-    let dir = match outcome {
-        PadOutcome::None => return,
-        PadOutcome::Blocked { dir, presses } => {
-            push_event(EV_BLOCKED, pack_blocked(screen, dir, presses));
-            return;
+    if let Some(dir) = frame.step {
+        let bounds_at = view.cursor + cursor::BOUNDS as u64;
+        let bounds = Rect {
+            xmin: read_f32(bounds_at),
+            xmax: read_f32(bounds_at + 4),
+            ymin: read_f32(bounds_at + 8),
+            ymax: read_f32(bounds_at + 12),
+        };
+        // From the target, so held repeats accumulate whole tiles while the
+        // hand is still easing.
+        let step = neighbour(&view.tiles, target, dir, &bounds);
+        if step.to.is_some() {
+            let out = (view.cursor + cursor::TARGET as u64) as *mut f32;
+            for (i, value) in [step.target.0, step.target.1, 0.0, 0.0]
+                .into_iter()
+                .enumerate()
+            {
+                out.add(i).write_volatile(value);
+            }
+            state.settle_cursor = view.cursor;
+            state.settle_frames = 0;
+            state.settle_token = view.token;
         }
-        PadOutcome::Step(dir) => dir,
-    };
-    let bounds_at = view.cursor + cursor::BOUNDS as u64;
-    let bounds = Rect {
-        xmin: read_f32(bounds_at),
-        xmax: read_f32(bounds_at + 4),
-        ymin: read_f32(bounds_at + 8),
-        ymax: read_f32(bounds_at + 12),
-    };
-    // From the target, so held repeats accumulate whole tiles while the
-    // hand is still easing.
-    let step = neighbour(&view.tiles, target, dir, &bounds);
-    if step.to.is_some() {
-        let out = (view.cursor + cursor::TARGET as u64) as *mut f32;
-        for (i, value) in [step.target.0, step.target.1, 0.0, 0.0]
-            .into_iter()
-            .enumerate()
-        {
-            out.add(i).write_volatile(value);
-        }
-        state.settle_cursor = view.cursor;
-        state.settle_frames = 0;
-        state.settle_token = view.token;
+        push_event(EV_STEP, pack_step(screen, dir, &step, view.token));
     }
-    push_event(EV_STEP, pack_step(screen, dir, &step, view.token));
+    if frame.blocked.iter().any(|&count| count != 0) {
+        push_event(EV_BLOCKED, pack_blocked(screen, frame.blocked));
+    }
 }
 
 #[skyline::hook(offset = model::CSS_PLAYERS_OFFSET, inline)]

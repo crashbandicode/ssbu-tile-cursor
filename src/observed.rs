@@ -246,8 +246,9 @@ pub(super) unsafe fn observe(screen: Screen, object: u64, view: Option<View>) {
     sample.resting = rest.is_some() && *REST.0.get() == rest;
     *REST.0.get() = rest;
     if last - first > 3 {
-        // The accepted owner produces at most SCREEN, SETTLED, STEP. A violated
-        // producer bound cannot certify counters or an input outcome.
+        // An ordinary update can emit SETTLED, STEP and BLOCKED. A SCREEN
+        // update resets the input and settle cursor, so it takes only the
+        // newest sample, emits at most one of STEP or BLOCKED, and no SETTLED.
         owner.begin(None, now);
         MAIL.offer(owner.latest);
         return;
@@ -258,7 +259,10 @@ pub(super) unsafe fn observe(screen: Screen, object: u64, view: Option<View>) {
         match code {
             EV_STEP => sample.step.emitted(slot.a.load(Ordering::Relaxed)),
             EV_BLOCKED => {
-                let presses = slot.a.load(Ordering::Relaxed) >> 16 & 0xff;
+                let presses = model::unpack_blocked(slot.a.load(Ordering::Relaxed))
+                    .into_iter()
+                    .map(u64::from)
+                    .sum::<u64>();
                 sample.step.blocked = sample.step.blocked.saturating_add(presses);
             }
             EV_SETTLED => {

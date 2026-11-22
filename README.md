@@ -29,12 +29,14 @@ drawn on the clips from the run's own input log.
 
 ## Behaviour
 
-- One step per press. Holding the combination repeats every 15 game frames
-  (250 ms at 60 fps). The cursor stops at the edges.
+- At most one step per update. Holding the combination repeats every 15 game
+  frames (250 ms at 60 fps). The cursor stops at the edges.
 - Recent pad samples are replayed only between consecutive updates where the
-  same hand could step, so a chord shorter than the gap between those updates
-  still steps once. A chord pressed while the hand may not step is logged as
-  `blocked … presses=<n>` and counted in `blocked=`.
+  same hand could step and the pad source stayed the same. Each press gets an
+  outcome in that update; nothing is carried over. Extra presses and presses
+  while the hand may not step are logged as `blocked … presses=<n>` and counted
+  in `blocked=`. Mixed directions use `dir=mixed presses=<n> up=<n> …` with only
+  non-zero directions listed.
 - Character select: steps only while the hand carries a token (P1's or a
   CPU's). With an empty hand nothing happens; press B to take the token back.
 - Without L3 the D-pad and stick behave as in the unmodified game. Nothing
