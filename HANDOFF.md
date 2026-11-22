@@ -1,4 +1,20 @@
-# Handoff: ssbu-tile-cursor, branch `tile/state-moving` (2026-11-22)
+# Handoff: ssbu-tile-cursor, branch `tile/cpu-coin` (2026-11-22)
+
+## CPU coin work
+
+This branch starts at `236c98d`. `docs/design/cpu-coin.md` traces the
+requirements; the red tests include the scm1 Random coin and empty-hand
+banner fixtures, and three old-reader goldens from the base. The observed
+Training owner publishes the 13 appended coin fields and permits an empty
+hand to target the game's offered coins; standalone movement stays unchanged.
+The CPU's at-rest Random coin was measured. Its held state and placement on
+a fighter are analogies, not scm1 measurements.
+
+No Eden proof, review, release, card install or push is authorized by this
+work. Gate and compliance receipts will be recorded under
+`smash-training-lobby/artifacts/phase23/tile-cursor-state/gate-<sha>/`;
+see the external `setup-calls/tile/HANDOFF-tile-cpu.md` for current status.
+The following sections describe the inherited `tile/state-moving` baseline.
 
 ## Branch and commits
 

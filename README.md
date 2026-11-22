@@ -42,8 +42,10 @@ drawn on the clips from the run's own input log.
   directions use `dir=mixed presses=<n> up=<n> …` with only non-zero directions
   listed. The state counters (`ack`, `applied`, `blocked`) are authoritative;
   `events.log` is written through a 64-event ring and is best-effort.
-- Character select: steps only while the hand carries a token (P1's or a
-  CPU's). With an empty hand nothing happens; press B to take the token back.
+- Character select: tile steps work while the hand carries a token (P1's or a
+  CPU's). With a registered bridge on Training's two-player fighter select,
+  an empty hand can use L3 + Left/Right to target the previous/next coin the
+  game offers. Up/Down are blocked. Standalone movement is unchanged.
 - State block: `observation.active=0` means the newest sample is older than
   0.3 s or the screen has no P1 view; a sample is never inactive merely because
   it was stamped after the publisher read the clock. A placed or hovered fighter
@@ -100,6 +102,17 @@ supplies tile-local focus. The native foreground and input-owner check from
 `ssbu.ui` is also required. The sole qualified below-grid entry is (-599,-236)
 with native hover -1; an Up step reaches default Steve, index 78. See
 [topologies/training-css.json](topologies/training-css.json).
+
+After the existing 43 lines, `hand.token` reports the coin the game points
+at for a resting empty hand; `p1.coin` / `p1.coin.at` report P1's own coin
+independently of the hand, and `cpu.token` / `cpu.placed.*` report the CPU
+coin. `carried.*` identifies the qualified fighter under either carried coin.
+`target.token` and `token.settled` identify and confirm an empty-hand token
+step. An edge advances `ack` without `applied`. When both coins overlap, the
+game may point at P1's coin instead; `token.settled` reflects that decision.
+The earlier `p1.token` and `placed.*` lines retain their existing meaning.
+CPU coin held and placed-on-fighter rules are analogies to P1, not measured
+by scm1; the at-rest Random coin was measured.
 
 The independent `grid` field identifies a matching native vector. On normal
 Training SSS, `grid=sss.9892b3a32e5c0164` identifies the captured vector and

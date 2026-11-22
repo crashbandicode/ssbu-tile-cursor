@@ -46,6 +46,18 @@ hand only while it held P1's own token.
 | `0x1a13078` | CSS fighter-picking update, per player. It reads the carried slot `+0x30`, the active flag `+0x36`, the hand `+0x20` and its cursor `+0x100`. |
 | `0x1a13148` | The same update. It skips the hover when the carried slot is -1. Otherwise it compares the hit tile with the hover record of that slot. |
 
+The optional observed owner checks six additional 64-byte witnesses from the
+owned 13.0.5 ELF. None is a hook.
+
+| Site | First instruction | What it confirms |
+|---|---|---|
+| `0x1a2f138` | `ldr x0, [x28, #0xdf0]` | Medal manager used by the hover update. |
+| `0x1a2f2c4` | `ldr x0, [x8, #0x20]` | Player hand and its area test. |
+| `0x1a2f378` | `ldr x8, [sp, #0x90]` | Medal candidate flags. |
+| `0x1a2f3dc` | `ldr x8, [x8, #0x28]` | Candidate pane position. |
+| `0x1a2f504` | `ldr x8, [x21, #0x8]` | Pointed-token update. |
+| `0x1a14618` | `ldr w21, [x8, #0x2c]` | Grab uses the pointed token. |
+
 ## Data
 
 ### Hand
@@ -56,6 +68,8 @@ The hand is shared by both screens. It is 0x170 bytes; the constructor is
 | Offset | Field |
 |---|---|
 | `+0x100` | The cursor. It is created by `0x3786640` and its vtable is `0x523dc80`. |
+| `+0x148..+0x154` | Hand area rectangle. |
+| `+0x162` | Shown. |
 | `+0x163` | Enabled. The binding `set_hand_enable` (`0x1b33440`) sets it. |
 | `+0x166` | Over a token that can be picked up. |
 | `+0x167` | Holding a token. |
@@ -116,16 +130,18 @@ them directly.
     own token, 1 the token of slot 2, and so on);
   - the hand-active flag at `+0x36`.
 
-  The plugin steps P1's hand on the CSS only while `+0x30` is a slot (0..7)
-  and the hand's `+0x167` is set. With an empty hand, L3 + D-pad does nothing
-  and the D-pad behaves as in the unmodified game.
+  The standalone owner steps only while `+0x30` is a slot (0..7) and the
+  hand's `+0x167` is set. The observed Training owner also lets an enabled,
+  shown empty hand target offered coins left/right in slot order.
 - **CSS panels.** Vector at `css+0x250` of 16-byte entries, panel at `+8`.
   Each panel has its slot at `+0x150`.
 - **Stage select hand.** At `sss+0x60`.
 - **Token ("medal") manager.** At `[css+0xdf0]` on the CSS and `[sss+0x70]` on
-  stage select: 10 entries of 0x130 bytes, plus the token area rectangle at
-  `+0xbec`. A token being carried follows the hand through the game's own
-  logic. The plugin does not touch it.
+  stage select: capacity 10 entries of 0x130 bytes, count at `+0xbe0`, and
+  the token area rectangle at `+0xbec`. The scm1 Training CSS count was 8;
+  only slots below the two player entries are offered. Candidate flags,
+  resting vectors and the pane position are checked exactly. A token being
+  carried follows the game's own logic. The plugin does not touch it.
 
 ## Input
 
