@@ -85,7 +85,7 @@ pub(super) unsafe fn coins(css: u64, view: &View) -> Option<Coins> {
     let hand_addr = read_u64(player + model::css::PLAYER_HAND as u64);
     if !valid(hand_addr)
         || read_u64(hand_addr + hand::CURSOR as u64) != view.cursor
-        || read_u8(player + model::css::PLAYER_ACTIVE as u64) == 0
+        || read_u8(player + model::css::PLAYER_ACTIVE as u64) != 1
         || read_u8(hand_addr + hand::ENABLED as u64) == 0
         || read_u8(hand_addr + hand::SHOWN as u64) == 0
         || read_i32(player + model::css::PLAYER_CARRIED as u64) != -1
@@ -204,6 +204,9 @@ pub(super) unsafe fn collect(css: u64, view: &View, coins: Option<&Coins>, sampl
     }
     if sample.p1_token == P1Token::Placed {
         sample.p1_placed = facts.placed.zip(facts.placed_fighter);
+    }
+    if sample.local_seat != Some(0) {
+        return;
     }
     if let Some(cpu_panel) = slot(css + 0x250, 0x150, 1) {
         let count = read_i32(medal + model::css::MEDAL_COUNT as u64);

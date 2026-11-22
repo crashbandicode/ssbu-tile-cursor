@@ -736,9 +736,10 @@ impl Publisher {
             HandToken::Slot(slot) => Endpoint::Index(u16::from(slot)),
         };
         let coin_view = active && s.screen == Some(Screen::Css);
+        let cpu_view = coin_view && s.local_seat == Some(0);
         let p1_coin = if coin_view { s.p1_coin } else { P1Token::Unknown };
-        let cpu_token = if coin_view { s.cpu_token } else { P1Token::Unknown };
-        let cpu_placed = coin_view.then_some(s.cpu_placed).flatten();
+        let cpu_token = if cpu_view { s.cpu_token } else { P1Token::Unknown };
+        let cpu_placed = cpu_view.then_some(s.cpu_placed).flatten();
         let carried = p1_view.then_some(s.carried_fighter).flatten();
         let target_token = match (p1_view, step.token_step, step.token_target) {
             (false, _, _) => Endpoint::Unknown,

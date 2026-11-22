@@ -28,6 +28,8 @@ Candidates use the game's flags, exact rest and pane equality, and the hand
 area; no tolerance or stale-state smoothing is added. Up/Down and extra
 presses remain blocked, and a missing neighbor is an edge.
 
+Not read: the fighter select's internal state. Not checked at runtime: sub-screens opened with an empty hand (the CPU level slider, the name list, the rules).
+
 The provider appends the 13 fields in `WIRE.md`. Token movement uses the
 existing ack and applied counters; token settling is based on the game's
 pointed slot and never impersonates carried-coin settling. The standalone

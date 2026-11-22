@@ -46,6 +46,7 @@ drawn on the clips from the run's own input log.
   CPU's). With a registered bridge on Training's two-player fighter select,
   an empty hand can use L3 + Left/Right to target the previous/next coin the
   game offers. Up/Down are blocked. Standalone movement is unchanged.
+  Not read: the fighter select's internal state. Not checked at runtime: sub-screens opened with an empty hand (the CPU level slider, the name list, the rules).
 - State block: `observation.active=0` means the newest sample is older than
   0.3 s or the screen has no P1 view; a sample is never inactive merely because
   it was stamped after the publisher read the clock. A placed or hovered fighter

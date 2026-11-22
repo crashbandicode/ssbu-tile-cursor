@@ -133,6 +133,7 @@ them directly.
   The standalone owner steps only while `+0x30` is a slot (0..7) and the
   hand's `+0x167` is set. The observed Training owner also lets an enabled,
   shown empty hand target offered coins left/right in slot order.
+  Not read: the fighter select's internal state. Not checked at runtime: sub-screens opened with an empty hand (the CPU level slider, the name list, the rules).
 - **CSS panels.** Vector at `css+0x250` of 16-byte entries, panel at `+8`.
   Each panel has its slot at `+0x150`.
 - **Stage select hand.** At `sss+0x60`.

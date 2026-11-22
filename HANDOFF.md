@@ -9,6 +9,10 @@ Training owner publishes the 13 appended coin fields and permits an empty
 hand to target the game's offered coins; standalone movement stays unchanged.
 The CPU's at-rest Random coin was measured. Its held state and placement on
 a fighter are analogies, not scm1 measurements.
+CPU fields are qualified by local seat 0 on Training's two-seat select; P1
+coin fields retain their original scope. The active player byte must equal 1.
+The fighter select's internal state is not read; empty-hand sub-screens have
+not been checked at runtime.
 
 No Eden proof, review, release, card install or push is authorized by this
 work. Gate and compliance receipts will be recorded under
