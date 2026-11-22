@@ -1007,13 +1007,231 @@ mod tests {
     const PAD_OWNER: PadOwner = (Screen::Css, 0x1000, 0x2000);
     const PAD_SOURCE: PadSource = (0, 1);
 
+    #[test]
+    fn fix4_r1_seen_presses_are_outcomes_before_turnover_or_gap() {
+        let up = BUTTON_L3 | BUTTON_UP;
+        let left = BUTTON_L3 | BUTTON_LEFT;
+        let batch = [(104, 0), (103, left), (102, 0), (101, up), (100, 0)];
+        let turned_over: Vec<_> = (105..=120).rev().map(|n| (n, 0)).collect();
+        for gap in [false, true] {
+            let mut input = PadInput::new();
+            assert_eq!(pad_frame(&mut input, PAD_OWNER, true, PAD_SOURCE, &[(100, 0)]), PadFrame::default());
+            assert_eq!(pad_frame(&mut input, PAD_OWNER, true, PAD_SOURCE, &batch),
+                       PadFrame { step: Some(Dir::Up), blocked: [0, 0, 1, 0] });
+            if gap {
+                input.gap();
+            }
+            assert_eq!(pad_frame(&mut input, PAD_OWNER, true, PAD_SOURCE, &turned_over), PadFrame::default());
+        }
+    }
+
+    #[test]
+    fn fix4_r2_press_and_trailing_samples_do_not_advance_hold() {
+        let up = BUTTON_L3 | BUTTON_UP;
+        for steppable in [false, true] {
+            for trailing in [false, true] {
+                let mut input = PadInput::new();
+                assert_eq!(pad_frame(&mut input, PAD_OWNER, steppable, PAD_SOURCE, &[(100, 0)]),
+                           PadFrame::default());
+                let ring = if trailing { vec![(102, up), (101, up), (100, 0)] }
+                           else { vec![(101, up), (100, 0)] };
+                let expected = if steppable { step(Dir::Up) } else { blocked(Dir::Up, 1) };
+                assert_eq!(pad_frame(&mut input, PAD_OWNER, steppable, PAD_SOURCE, &ring), expected);
+                let newest = ring[0].0;
+                for following in 1..=15 {
+                    let outcome = pad_frame(&mut input, PAD_OWNER, steppable, PAD_SOURCE,
+                                            &[(newest + following, up)]);
+                    assert_eq!(outcome, if following == 15 { expected } else { PadFrame::default() },
+                               "steppable={steppable} trailing={trailing} following={following}");
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn fix4_r3_mixed_and_single_direction_blocked_records_round_trip() {
+        let mut input = PadInput::new();
+        let up = BUTTON_L3 | BUTTON_UP;
+        let left = BUTTON_L3 | BUTTON_LEFT;
+        assert_eq!(pad_frame(&mut input, PAD_OWNER, false, PAD_SOURCE, &[(100, 0)]), PadFrame::default());
+        let mixed = [(104, 0), (103, left), (102, 0), (101, up), (100, 0)];
+        let counts = pad_frame(&mut input, PAD_OWNER, false, PAD_SOURCE, &mixed).blocked;
+        assert_eq!(counts, [1, 0, 1, 0]);
+        let (a, b) = pack_blocked(Screen::Css, counts);
+        assert_eq!(unpack_blocked(a), counts);
+        let mut line = Line::<128>::new();
+        describe(&RawEvent { tick: 7, code: EV_BLOCKED, a, b }, &mut line).unwrap();
+        assert_eq!(core::str::from_utf8(line.as_bytes()).unwrap(),
+                   "7 blocked screen=css dir=mixed presses=2 up=1 left=1");
+
+        let repeated = [(107, up), (106, 0), (105, up), (104, 0)];
+        let counts = pad_frame(&mut input, PAD_OWNER, false, PAD_SOURCE, &repeated).blocked;
+        assert_eq!(counts, [2, 0, 0, 0]);
+        let (a, b) = pack_blocked(Screen::Css, counts);
+        assert_eq!(unpack_blocked(a), counts);
+        let mut line = Line::<128>::new();
+        describe(&RawEvent { tick: 7, code: EV_BLOCKED, a, b }, &mut line).unwrap();
+        assert_eq!(core::str::from_utf8(line.as_bytes()).unwrap(),
+                   "7 blocked screen=css dir=up presses=2");
+    }
+
+    fn fix4_generated_batches(with_gaps: bool) {
+        fn draw(seed: &mut u64) -> u32 {
+            *seed = seed.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+            (*seed >> 32) as u32
+        }
+        fn chord(buttons: u64) -> Option<usize> {
+            if buttons & BUTTON_L3 == 0 {
+                return None;
+            }
+            match buttons & (BUTTON_UP | BUTTON_DOWN | BUTTON_LEFT | BUTTON_RIGHT) {
+                BUTTON_UP => Some(0),
+                BUTTON_DOWN => Some(1),
+                BUTTON_LEFT => Some(2),
+                BUTTON_RIGHT => Some(3),
+                _ => None,
+            }
+        }
+        let choices = [
+            0, BUTTON_L3, BUTTON_L3 | BUTTON_UP, BUTTON_L3 | BUTTON_DOWN,
+            BUTTON_L3 | BUTTON_LEFT, BUTTON_L3 | BUTTON_RIGHT, BUTTON_UP,
+            BUTTON_L3 | BUTTON_UP | BUTTON_LEFT,
+        ];
+        let mut seed = 0x72ac_1043_5e67_981b;
+        let mut input = PadInput::new();
+        let mut owner = PAD_OWNER;
+        let mut ring = vec![(100, 0)];
+        let mut number = 100;
+        let mut steps_held = None;
+        let mut blocked_held = None;
+        let mut previous_steppable = false;
+        let mut history = false;
+        let mut hold_age = 0;
+        let mut sizes = [0usize; 7];
+        let mut gaps = 0;
+        let mut cursors = 0;
+        for update in 0..6000 {
+            if with_gaps && draw(&mut seed).is_multiple_of(19) {
+                input.gap();
+                history = false;
+                gaps += 1;
+            }
+            if with_gaps && draw(&mut seed).is_multiple_of(23) {
+                owner.2 ^= 1;
+                history = false;
+                cursors += 1;
+            }
+            let mut n = draw(&mut seed) as usize % 7;
+            if update % 4 == 3 && n == 0 {
+                n = 1;
+            }
+            sizes[n] += 1;
+            let mut added = Vec::new();
+            for index in 0..n {
+                let mut buttons = choices[draw(&mut seed) as usize % choices.len()];
+                if update % 4 == 3 && index + 1 == n {
+                    buttons = 0;
+                }
+                number += 1;
+                ring.insert(0, (number, buttons));
+                ring.truncate(PAD_RING);
+                added.push(buttons);
+            }
+            let steppable = !draw(&mut seed).is_multiple_of(3);
+            let selected = if !history || (steppable && !previous_steppable) {
+                vec![ring[0].1]
+            } else {
+                added
+            };
+            let held = if steppable {
+                blocked_held = None;
+                &mut steps_held
+            } else {
+                steps_held = None;
+                &mut blocked_held
+            };
+            let mut presses = Vec::new();
+            for buttons in selected {
+                let next = chord(buttons);
+                if next != *held {
+                    *held = next;
+                    if let Some(dir) = next {
+                        presses.push(dir);
+                    }
+                }
+            }
+            hold_age = if presses.is_empty() && held.is_some() { hold_age + 1 } else { 0 };
+            assert!(hold_age < usize::from(REPEAT_FRAMES), "generator held a chord too long");
+            let expected_step = if steppable { presses.first().copied() } else { None };
+            let mut expected_blocked = [0u8; 4];
+            for &dir in presses.iter().skip(usize::from(expected_step.is_some())) {
+                expected_blocked[dir] += 1;
+            }
+            let outcome = pad_frame(&mut input, owner, steppable, PAD_SOURCE, &ring);
+            assert_eq!(outcome.step.map(|d| d as usize), expected_step, "step update {update}");
+            assert_eq!(outcome.blocked, expected_blocked, "blocked update {update}");
+            assert_eq!(u32::from(outcome.step.is_some()) + outcome.blocked.iter().map(|&n| u32::from(n)).sum::<u32>(),
+                       presses.len() as u32, "outcome count update {update}");
+            assert!(steppable || outcome.step.is_none());
+            history = true;
+            previous_steppable = steppable;
+        }
+        assert!(sizes.iter().all(|&count| count > 0), "{sizes:?}");
+        if with_gaps {
+            assert!(gaps > 0 && cursors > 0);
+        }
+    }
+
+    #[test]
+    fn fix4_r4_generated_batches_preserve_every_transition() {
+        fix4_generated_batches(false);
+    }
+
+    #[test]
+    fn fix4_r4_generated_batches_after_gaps_and_cursor_changes() {
+        fix4_generated_batches(true);
+    }
+
+    #[test]
+    fn fix4_scan_later_counts_saturate_per_direction() {
+        let mut input = Vec::new();
+        for _ in 0..300 {
+            input.extend([BUTTON_L3 | BUTTON_UP, 0]);
+        }
+        let mut repeater = Repeater::new();
+        assert_eq!(repeater.scan(&input),
+                   Scan { first: Some(Dir::Up), later: [u8::MAX, 0, 0, 0], repeat: None });
+        assert_eq!(repeater.scan(&[]), Scan::default());
+    }
+
+    #[test]
+    fn fix4_mixed_blocked_total_does_not_saturate_at_one_byte() {
+        let counts = [255, 255, 2, 1];
+        let (a, b) = pack_blocked(Screen::Sss, counts);
+        assert_eq!(unpack_blocked(a), counts);
+        let mut line = Line::<128>::new();
+        describe(&RawEvent { tick: 7, code: EV_BLOCKED, a, b }, &mut line).unwrap();
+        assert_eq!(core::str::from_utf8(line.as_bytes()).unwrap(),
+                   "7 blocked screen=sss dir=mixed presses=513 up=255 down=255 left=2 right=1");
+    }
+
+    fn step(dir: Dir) -> PadFrame {
+        PadFrame { step: Some(dir), blocked: [0; 4] }
+    }
+
+    fn blocked(dir: Dir, count: u8) -> PadFrame {
+        let mut counts = [0; 4];
+        counts[dir as usize] = count;
+        PadFrame { step: None, blocked: counts }
+    }
+
     fn pad_frame(
         input: &mut PadInput,
         owner: PadOwner,
         steppable: bool,
         source: PadSource,
         ring: &[(i64, u64)],
-    ) -> PadOutcome {
+    ) -> PadFrame {
         input.frame(owner, steppable, Some((source, ring)), || {
             panic!("unexpected single-sample fallback")
         })
@@ -1040,9 +1258,9 @@ mod tests {
                 pad_frame(&mut input, owner, true, source, &[(100 + i64::from(frame), chord)])
             };
             let expected = if frame == 0 || frame == REPEAT_FRAMES {
-                PadOutcome::Step(Dir::Up)
+                step(Dir::Up)
             } else {
-                PadOutcome::None
+                PadFrame::default()
             };
             assert_eq!(outcome, expected, "callback {}", frame + 1);
         }
@@ -1073,16 +1291,16 @@ mod tests {
         let chord = BUTTON_L3 | BUTTON_UP;
         let mut input = PadInput::new();
         assert_eq!(pad_frame(&mut input, PAD_OWNER, true, PAD_SOURCE, &[(100, chord)]),
-                   PadOutcome::Step(Dir::Up));
+                   step(Dir::Up));
         input.reset();
         assert_eq!(pad_frame(&mut input, PAD_OWNER, true, PAD_SOURCE, &[(101, chord)]),
-                   PadOutcome::Step(Dir::Up));
+                   step(Dir::Up));
         let other_object = (PAD_OWNER.0, PAD_OWNER.1 + 1, PAD_OWNER.2);
         assert_eq!(pad_frame(&mut input, other_object, true, PAD_SOURCE, &[(102, chord)]),
-                   PadOutcome::Step(Dir::Up));
+                   step(Dir::Up));
         let other_screen = (Screen::Sss, other_object.1, other_object.2);
         assert_eq!(pad_frame(&mut input, other_screen, true, PAD_SOURCE, &[(103, chord)]),
-                   PadOutcome::Step(Dir::Up));
+                   step(Dir::Up));
     }
 
     fn compare_single_samples_with_pre_ring_rule(owner_changes: bool) {
@@ -1097,6 +1315,7 @@ mod tests {
         ];
         let mut input = PadInput::new();
         let mut reference = Repeater::new();
+        let mut blocked_reference = Repeater::new();
         let mut seed = 0x1f4d_2a83_6b70_c951;
         let mut owner = PAD_OWNER;
         let mut source = PAD_SOURCE;
@@ -1124,6 +1343,7 @@ mod tests {
                     coverage[6] += 1;
                 }
                 reference = Repeater::new();
+                blocked_reference = Repeater::new();
             }
             if draw(&mut seed).is_multiple_of(11) {
                 coverage[2] += 1;
@@ -1138,16 +1358,23 @@ mod tests {
                 coverage[4] += 1;
             }
             let expected = reference.update(if steppable { buttons } else { 0 });
+            let expected_blocked = if steppable {
+                blocked_reference = Repeater::new();
+                None
+            } else {
+                blocked_reference.update(buttons)
+            };
             let outcome = if ring_available {
                 input.frame(owner, steppable, Some((source, &ring)), || panic!("unexpected fallback"))
             } else {
                 input.frame(owner, steppable, None, || buttons)
             };
-            let actual = match outcome {
-                PadOutcome::Step(dir) => Some(dir),
-                PadOutcome::None | PadOutcome::Blocked { .. } => None,
-            };
-            assert_eq!(actual, expected, "callback {callback}, buttons {buttons:#x}, steppable {steppable}, ring {ring_available}");
+            assert_eq!(outcome.step, expected, "callback {callback}, buttons {buttons:#x}, steppable {steppable}, ring {ring_available}");
+            let mut expected_counts = [0; 4];
+            if let Some(dir) = expected_blocked {
+                expected_counts[dir as usize] = 1;
+            }
+            assert_eq!(outcome.blocked, expected_counts, "blocked callback {callback}");
         }
         assert!(coverage[..5].iter().all(|&n| n > 0), "{coverage:?}");
         if owner_changes {
@@ -1169,48 +1396,48 @@ mod tests {
     fn blocked_taps_are_counted_and_never_replayed_as_steps() {
         let mut input = PadInput::new();
         let chord = BUTTON_L3 | BUTTON_UP;
-        assert_eq!(pad_frame(&mut input, PAD_OWNER, true, PAD_SOURCE, &[(100, 0)]), PadOutcome::None);
+        assert_eq!(pad_frame(&mut input, PAD_OWNER, true, PAD_SOURCE, &[(100, 0)]), PadFrame::default());
         let ring = [(104, 0), (103, chord), (102, 0), (101, chord), (100, 0)];
         assert_eq!(pad_frame(&mut input, PAD_OWNER, false, PAD_SOURCE, &ring),
-                   PadOutcome::Blocked { dir: Dir::Up, presses: 2 });
-        assert_eq!(pad_frame(&mut input, PAD_OWNER, true, PAD_SOURCE, &ring), PadOutcome::None);
+                   blocked(Dir::Up, 2));
+        assert_eq!(pad_frame(&mut input, PAD_OWNER, true, PAD_SOURCE, &ring), PadFrame::default());
         assert_eq!(pad_frame(&mut input, PAD_OWNER, true, PAD_SOURCE, &[(105, 0), (104, 0)]),
-                   PadOutcome::None);
+                   PadFrame::default());
     }
 
     #[test]
     fn missing_view_taps_are_not_replayed_as_steps() {
         let mut input = PadInput::new();
         let chord = BUTTON_L3 | BUTTON_UP;
-        assert_eq!(pad_frame(&mut input, PAD_OWNER, true, PAD_SOURCE, &[(100, 0)]), PadOutcome::None);
+        assert_eq!(pad_frame(&mut input, PAD_OWNER, true, PAD_SOURCE, &[(100, 0)]), PadFrame::default());
         input.gap();
         let ring = [(103, 0), (102, chord), (101, chord), (100, 0)];
-        assert_eq!(pad_frame(&mut input, PAD_OWNER, true, PAD_SOURCE, &ring), PadOutcome::None);
-        assert_eq!(pad_frame(&mut input, PAD_OWNER, true, PAD_SOURCE, &ring), PadOutcome::None);
+        assert_eq!(pad_frame(&mut input, PAD_OWNER, true, PAD_SOURCE, &ring), PadFrame::default());
+        assert_eq!(pad_frame(&mut input, PAD_OWNER, true, PAD_SOURCE, &ring), PadFrame::default());
     }
 
     #[test]
     fn changing_only_the_cursor_discards_old_history() {
         let mut input = PadInput::new();
         let chord = BUTTON_L3 | BUTTON_UP;
-        assert_eq!(pad_frame(&mut input, PAD_OWNER, true, PAD_SOURCE, &[(100, 0)]), PadOutcome::None);
+        assert_eq!(pad_frame(&mut input, PAD_OWNER, true, PAD_SOURCE, &[(100, 0)]), PadFrame::default());
         let other = (PAD_OWNER.0, PAD_OWNER.1, PAD_OWNER.2 + 1);
         let ring = [(103, 0), (102, chord), (101, chord), (100, 0)];
-        assert_eq!(pad_frame(&mut input, other, true, PAD_SOURCE, &ring), PadOutcome::None);
-        assert_eq!(pad_frame(&mut input, other, true, PAD_SOURCE, &ring), PadOutcome::None);
+        assert_eq!(pad_frame(&mut input, other, true, PAD_SOURCE, &ring), PadFrame::default());
+        assert_eq!(pad_frame(&mut input, other, true, PAD_SOURCE, &ring), PadFrame::default());
     }
 
     #[test]
     fn changing_pad_source_primes_only_its_newest_sample() {
         let mut input = PadInput::new();
         let chord = BUTTON_L3 | BUTTON_UP;
-        assert_eq!(pad_frame(&mut input, PAD_OWNER, true, PAD_SOURCE, &[(100, 0)]), PadOutcome::None);
+        assert_eq!(pad_frame(&mut input, PAD_OWNER, true, PAD_SOURCE, &[(100, 0)]), PadFrame::default());
         let other = (PAD_SOURCE.0 + 1, PAD_SOURCE.1);
         let ring = [(103, 0), (102, chord), (101, chord), (100, 0)];
-        assert_eq!(pad_frame(&mut input, PAD_OWNER, true, other, &ring), PadOutcome::None);
-        assert_eq!(pad_frame(&mut input, PAD_OWNER, true, other, &ring), PadOutcome::None);
+        assert_eq!(pad_frame(&mut input, PAD_OWNER, true, other, &ring), PadFrame::default());
+        assert_eq!(pad_frame(&mut input, PAD_OWNER, true, other, &ring), PadFrame::default());
         assert_eq!(pad_frame(&mut input, PAD_OWNER, true, other, &[(104, chord), (103, 0)]),
-                   PadOutcome::Step(Dir::Up));
+                   step(Dir::Up));
     }
 
     #[test]
@@ -1218,11 +1445,11 @@ mod tests {
         let mut input = PadInput::new();
         let chord = BUTTON_L3 | BUTTON_UP;
         assert_eq!(pad_frame(&mut input, PAD_OWNER, true, PAD_SOURCE, &[(100, chord)]),
-                   PadOutcome::Step(Dir::Up));
+                   step(Dir::Up));
         for _ in 0..20 {
-            assert_eq!(input.frame(PAD_OWNER, true, None, || 0), PadOutcome::None);
+            assert_eq!(input.frame(PAD_OWNER, true, None, || 0), PadFrame::default());
         }
-        assert_eq!(input.frame(PAD_OWNER, true, None, || chord), PadOutcome::Step(Dir::Up));
+        assert_eq!(input.frame(PAD_OWNER, true, None, || chord), step(Dir::Up));
     }
 
     #[test]
@@ -1230,11 +1457,11 @@ mod tests {
         let mut input = PadInput::new();
         let chord = BUTTON_L3 | BUTTON_UP;
         assert_eq!(pad_frame(&mut input, PAD_OWNER, true, PAD_SOURCE, &[(100, chord)]),
-                   PadOutcome::Step(Dir::Up));
+                   step(Dir::Up));
         for _ in 1..REPEAT_FRAMES {
-            assert_eq!(input.frame(PAD_OWNER, true, None, || chord), PadOutcome::None);
+            assert_eq!(input.frame(PAD_OWNER, true, None, || chord), PadFrame::default());
         }
-        assert_eq!(input.frame(PAD_OWNER, true, None, || chord), PadOutcome::Step(Dir::Up));
+        assert_eq!(input.frame(PAD_OWNER, true, None, || chord), step(Dir::Up));
     }
 
     #[test]
@@ -1247,41 +1474,42 @@ mod tests {
             &[(109, 0), (108, 0), (107, 0), (106, 0), (105, chord), (104, chord), (103, chord)],
         ];
         let outcomes: Vec<_> = rings.iter().map(|r| pad_frame(&mut input, PAD_OWNER, true, PAD_SOURCE, r)).collect();
-        assert_eq!(outcomes, [PadOutcome::None, PadOutcome::Step(Dir::Up), PadOutcome::None]);
+        assert_eq!(outcomes, [PadFrame::default(), step(Dir::Up), PadFrame::default()]);
     }
 
     #[test]
-    fn two_steppable_taps_are_deferred_across_frames() {
+    fn two_steppable_taps_step_once_and_block_the_second() {
         let mut input = PadInput::new();
         let chord = BUTTON_L3 | BUTTON_UP;
-        assert_eq!(pad_frame(&mut input, PAD_OWNER, true, PAD_SOURCE, &[(100, 0)]), PadOutcome::None);
+        assert_eq!(pad_frame(&mut input, PAD_OWNER, true, PAD_SOURCE, &[(100, 0)]), PadFrame::default());
         let ring = [(104, 0), (103, chord), (102, 0), (101, chord), (100, 0)];
-        assert_eq!(pad_frame(&mut input, PAD_OWNER, true, PAD_SOURCE, &ring), PadOutcome::Step(Dir::Up));
-        assert_eq!(pad_frame(&mut input, PAD_OWNER, true, PAD_SOURCE, &ring), PadOutcome::Step(Dir::Up));
-        assert_eq!(pad_frame(&mut input, PAD_OWNER, true, PAD_SOURCE, &ring), PadOutcome::None);
+        assert_eq!(pad_frame(&mut input, PAD_OWNER, true, PAD_SOURCE, &ring),
+                   PadFrame { step: Some(Dir::Up), blocked: [1, 0, 0, 0] });
+        assert_eq!(pad_frame(&mut input, PAD_OWNER, true, PAD_SOURCE, &ring), PadFrame::default());
+        assert_eq!(pad_frame(&mut input, PAD_OWNER, true, PAD_SOURCE, &ring), PadFrame::default());
     }
 
     #[test]
     fn held_chord_at_blocked_exit_steps_once() {
         let mut input = PadInput::new();
         let chord = BUTTON_L3 | BUTTON_UP;
-        assert_eq!(pad_frame(&mut input, PAD_OWNER, true, PAD_SOURCE, &[(100, 0)]), PadOutcome::None);
+        assert_eq!(pad_frame(&mut input, PAD_OWNER, true, PAD_SOURCE, &[(100, 0)]), PadFrame::default());
         let ring = [(102, chord), (101, chord), (100, 0)];
         assert_eq!(pad_frame(&mut input, PAD_OWNER, false, PAD_SOURCE, &ring),
-                   PadOutcome::Blocked { dir: Dir::Up, presses: 1 });
-        assert_eq!(pad_frame(&mut input, PAD_OWNER, true, PAD_SOURCE, &ring), PadOutcome::Step(Dir::Up));
-        assert_eq!(pad_frame(&mut input, PAD_OWNER, true, PAD_SOURCE, &ring), PadOutcome::None);
+                   blocked(Dir::Up, 1));
+        assert_eq!(pad_frame(&mut input, PAD_OWNER, true, PAD_SOURCE, &ring), step(Dir::Up));
+        assert_eq!(pad_frame(&mut input, PAD_OWNER, true, PAD_SOURCE, &ring), PadFrame::default());
     }
 
     #[test]
     fn held_chord_at_gap_exit_steps_once() {
         let mut input = PadInput::new();
         let chord = BUTTON_L3 | BUTTON_UP;
-        assert_eq!(pad_frame(&mut input, PAD_OWNER, true, PAD_SOURCE, &[(100, 0)]), PadOutcome::None);
+        assert_eq!(pad_frame(&mut input, PAD_OWNER, true, PAD_SOURCE, &[(100, 0)]), PadFrame::default());
         input.gap();
         let ring = [(102, chord), (101, chord), (100, 0)];
-        assert_eq!(pad_frame(&mut input, PAD_OWNER, true, PAD_SOURCE, &ring), PadOutcome::Step(Dir::Up));
-        assert_eq!(pad_frame(&mut input, PAD_OWNER, true, PAD_SOURCE, &ring), PadOutcome::None);
+        assert_eq!(pad_frame(&mut input, PAD_OWNER, true, PAD_SOURCE, &ring), step(Dir::Up));
+        assert_eq!(pad_frame(&mut input, PAD_OWNER, true, PAD_SOURCE, &ring), PadFrame::default());
     }
 
     #[test]
@@ -1290,29 +1518,36 @@ mod tests {
         let chord = BUTTON_L3 | BUTTON_UP;
         let ring = [(100, chord)];
         assert_eq!(pad_frame(&mut input, PAD_OWNER, false, PAD_SOURCE, &ring),
-                   PadOutcome::Blocked { dir: Dir::Up, presses: 1 });
+                   blocked(Dir::Up, 1));
         for _ in 1..REPEAT_FRAMES {
-            assert_eq!(pad_frame(&mut input, PAD_OWNER, false, PAD_SOURCE, &ring), PadOutcome::None);
+            assert_eq!(pad_frame(&mut input, PAD_OWNER, false, PAD_SOURCE, &ring), PadFrame::default());
         }
         assert_eq!(pad_frame(&mut input, PAD_OWNER, false, PAD_SOURCE, &ring),
-                   PadOutcome::Blocked { dir: Dir::Up, presses: 1 });
+                   blocked(Dir::Up, 1));
     }
 
     #[test]
-    fn deferred_steppable_tap_is_drained_as_blocked() {
+    fn later_steppable_tap_is_blocked_without_deferral() {
         let mut input = PadInput::new();
         let up = BUTTON_L3 | BUTTON_UP;
         let down = BUTTON_L3 | BUTTON_DOWN;
-        assert_eq!(pad_frame(&mut input, PAD_OWNER, true, PAD_SOURCE, &[(100, 0)]), PadOutcome::None);
+        assert_eq!(pad_frame(&mut input, PAD_OWNER, true, PAD_SOURCE, &[(100, 0)]), PadFrame::default());
         let ring = [(104, 0), (103, down), (102, 0), (101, up), (100, 0)];
-        assert_eq!(pad_frame(&mut input, PAD_OWNER, true, PAD_SOURCE, &ring), PadOutcome::Step(Dir::Up));
+        assert_eq!(pad_frame(&mut input, PAD_OWNER, true, PAD_SOURCE, &ring),
+                   PadFrame { step: Some(Dir::Up), blocked: [0, 1, 0, 0] });
         assert_eq!(pad_frame(&mut input, PAD_OWNER, false, PAD_SOURCE, &ring),
-                   PadOutcome::Blocked { dir: Dir::Down, presses: 1 });
-        assert_eq!(pad_frame(&mut input, PAD_OWNER, true, PAD_SOURCE, &ring), PadOutcome::None);
+                   PadFrame::default());
+        assert_eq!(pad_frame(&mut input, PAD_OWNER, true, PAD_SOURCE, &ring), PadFrame::default());
+    }
+
+    fn scan_one(r: &mut Repeater, samples: &[u64]) -> Option<Dir> {
+        let result = r.scan(samples);
+        assert_eq!(result.later, [0; 4]);
+        result.first.or(result.repeat)
     }
 
     fn play(r: &mut Repeater, frames: &[&[u64]]) -> Vec<Option<Dir>> {
-        frames.iter().map(|f| r.feed(f).0).collect()
+        frames.iter().map(|f| scan_one(r, f)).collect()
     }
 
     #[test]
@@ -1354,11 +1589,11 @@ mod tests {
             ],
         ];
         let mut steps = Vec::new();
-        for (ring, expected_last) in rings.iter().zip([100, 103, 109]) {
+        for (ring, expected_last) in rings.iter().zip([100, 106, 109]) {
             let count = tracker.unseen(ring, &mut out);
             let buttons: Vec<_> = out[..count].iter().map(|(_, buttons)| *buttons).collect();
-            let (step, used) = r.feed(&buttons);
-            tracker.consume(&out[..count], used);
+            let step = scan_one(&mut r, &buttons);
+            tracker.consume(&out[..count], count);
             assert_eq!(tracker.last, Some(expected_last));
             steps.push(step);
         }
@@ -1366,55 +1601,55 @@ mod tests {
     }
 
     #[test]
-    fn two_taps_in_one_batch_are_preserved_for_successive_frames() {
+    fn two_taps_in_one_batch_are_reported_together() {
         let chord = BUTTON_L3 | BUTTON_UP;
         let mut r = Repeater::new();
-        assert_eq!(r.feed(&[chord, 0, chord, 0]), (Some(Dir::Up), 1));
-        assert_eq!(r.feed(&[0, chord, 0]), (Some(Dir::Up), 2));
-        assert_eq!(r.feed(&[0]), (None, 1));
-        assert_eq!(r.feed(&[]), (None, 0));
+        assert_eq!(r.scan(&[chord, 0, chord, 0]),
+                   Scan { first: Some(Dir::Up), later: [1, 0, 0, 0], repeat: None });
+        assert_eq!(r.scan(&[0]), Scan::default());
+        assert_eq!(r.scan(&[]), Scan::default());
     }
 
     #[test]
     fn multiple_samples_count_as_one_repeat_frame() {
         let chord = BUTTON_L3 | BUTTON_RIGHT;
         let mut r = Repeater::new();
-        assert_eq!(r.feed(&[chord]), (Some(Dir::Right), 1));
+        assert_eq!(scan_one(&mut r, &[chord]), Some(Dir::Right));
         for _ in 1..REPEAT_FRAMES {
-            assert_eq!(r.feed(&[chord, chord, chord]), (None, 3));
+            assert_eq!(scan_one(&mut r, &[chord, chord, chord]), None);
         }
-        assert_eq!(r.feed(&[chord, chord, chord]), (Some(Dir::Right), 3));
+        assert_eq!(scan_one(&mut r, &[chord, chord, chord]), Some(Dir::Right));
 
         let mut old = Repeater::new();
         let mut batched = Repeater::new();
         let sequence = [0, BUTTON_L3, chord, chord, 0, BUTTON_UP, BUTTON_L3 | BUTTON_UP,
                         BUTTON_L3 | BUTTON_UP | BUTTON_RIGHT, chord];
         for buttons in sequence.into_iter().cycle().take(200) {
-            assert_eq!(old.update(buttons), batched.feed(&[buttons]).0);
+            assert_eq!(old.update(buttons), scan_one(&mut batched, &[buttons]));
         }
     }
 
     #[test]
     fn batch_handles_release_direction_diagonal_and_l3_order() {
         let mut r = Repeater::new();
-        assert_eq!(r.feed(&[BUTTON_L3 | BUTTON_UP]), (Some(Dir::Up), 1));
-        assert_eq!(r.feed(&[0, BUTTON_L3 | BUTTON_RIGHT]), (Some(Dir::Right), 2));
-        assert_eq!(r.feed(&[BUTTON_L3 | BUTTON_UP | BUTTON_RIGHT]), (None, 1));
-        assert_eq!(r.feed(&[BUTTON_UP]), (None, 1));
-        assert_eq!(r.feed(&[BUTTON_UP, BUTTON_L3 | BUTTON_UP]), (Some(Dir::Up), 2));
+        assert_eq!(scan_one(&mut r, &[BUTTON_L3 | BUTTON_UP]), Some(Dir::Up));
+        assert_eq!(scan_one(&mut r, &[0, BUTTON_L3 | BUTTON_RIGHT]), Some(Dir::Right));
+        assert_eq!(scan_one(&mut r, &[BUTTON_L3 | BUTTON_UP | BUTTON_RIGHT]), None);
+        assert_eq!(scan_one(&mut r, &[BUTTON_UP]), None);
+        assert_eq!(scan_one(&mut r, &[BUTTON_UP, BUTTON_L3 | BUTTON_UP]), Some(Dir::Up));
     }
 
     #[test]
     fn empty_batch_advances_held_repeats_once() {
         let mut r = Repeater::new();
-        assert_eq!(r.feed(&[]), (None, 0));
-        assert_eq!(r.feed(&[BUTTON_L3 | BUTTON_UP]), (Some(Dir::Up), 1));
+        assert_eq!(scan_one(&mut r, &[]), None);
+        assert_eq!(scan_one(&mut r, &[BUTTON_L3 | BUTTON_UP]), Some(Dir::Up));
         for _ in 1..REPEAT_FRAMES {
-            assert_eq!(r.feed(&[]), (None, 0));
+            assert_eq!(scan_one(&mut r, &[]), None);
         }
-        assert_eq!(r.feed(&[]), (Some(Dir::Up), 0));
-        assert_eq!(r.feed(&[0]), (None, 1));
-        assert_eq!(r.feed(&[]), (None, 0));
+        assert_eq!(scan_one(&mut r, &[]), Some(Dir::Up));
+        assert_eq!(scan_one(&mut r, &[0]), None);
+        assert_eq!(scan_one(&mut r, &[]), None);
     }
 
     #[test]
@@ -1458,10 +1693,10 @@ mod tests {
             (Screen::Css, "css", Dir::Up, "up"),
             (Screen::Sss, "sss", Dir::Left, "left"),
         ] {
-            let (a, b) = pack_blocked(screen, dir, 2);
+            let counts = blocked(dir, 2).blocked;
+            let (a, b) = pack_blocked(screen, counts);
             assert_eq!(Screen::from_code(a & 0xff), screen);
-            assert_eq!(Dir::from_code((a >> 8) as u8), Some(dir));
-            assert_eq!((a >> 16) as u8, 2);
+            assert_eq!(unpack_blocked(a), counts);
             let mut line = Line::<128>::new();
             describe(&RawEvent { tick: 7, code: EV_BLOCKED, a, b }, &mut line).unwrap();
             assert_eq!(core::str::from_utf8(line.as_bytes()).unwrap(),
