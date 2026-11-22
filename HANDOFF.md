@@ -14,8 +14,9 @@ coin fields retain their original scope. The active player byte must equal 1.
 The fighter select's internal state is not read; empty-hand sub-screens have
 not been checked at runtime.
 
-No Eden proof, review, release, card install or push is authorized by this
-work. Gate and compliance receipts will be recorded under
+Finding 1's assertion-level red is `1923f6f`; the CPU scope and active-byte
+fix is `34b2dc2`. No Eden proof, release, card install or push is authorized
+by this work. Gate and compliance receipts are under
 `smash-training-lobby/artifacts/phase23/tile-cursor-state/gate-<sha>/`;
 see the external `setup-calls/tile/HANDOFF-tile-cpu.md` for current status.
 The following sections describe the inherited `tile/state-moving` baseline.
@@ -116,5 +117,5 @@ cargo clippy --all-targets -- -D warnings
 cargo build --no-default-features
 cargo skyline build --release
 cargo skyline build --release --features diag
-python3 -I ~/ssbu-mod-playbook/tools/check/compliance.py . --nro <release NRO> --base 75a90e3
+python3 -I ~/ssbu-mod-playbook/tools/check/compliance.py . --nro <release NRO> --base 236c98d --trace docs/design/cpu-coin.md
 ```
