@@ -157,7 +157,7 @@ fn lock_order_optional_owners_reach_only_nonblocking_capture() {
     assert!(violations.is_empty(), "{violations:?}");
     assert_eq!(
         sources[1]
-            .matches("on_screen(screen, object, &view);")
+            .matches("on_screen(screen, object, &view, coins.as_ref());")
             .count(),
         1
     );
@@ -165,7 +165,9 @@ fn lock_order_optional_owners_reach_only_nonblocking_capture() {
         "observe",
         "grid",
         "identify",
-        "collect",
+            "collect",
+            "coins",
+            "coin_offer",
         "read_local_seat",
         "token",
         "claimed",
@@ -177,6 +179,8 @@ fn lock_order_optional_owners_reach_only_nonblocking_capture() {
     ] {
         assert!(reached.contains(name), "missing owner path to {name}");
     }
+    let (_, token_violations) = audit(&sources, &["empty_hand", "token_target", "pack_token"]);
+    assert!(token_violations.is_empty(), "{token_violations:?}");
 }
 
 #[test]
