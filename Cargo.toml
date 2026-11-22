@@ -17,6 +17,11 @@ crate-type = ["cdylib"]
 [target.'cfg(target_os = "switch")'.dependencies]
 skyline = "=0.6.0"
 
+[features]
+# Declared for the shared gate (`cargo skyline build --release --features diag`).
+# This plugin has no diag-only code: the diag build equals the release build.
+diag = []
+
 [profile.dev]
 panic = "abort"
 
