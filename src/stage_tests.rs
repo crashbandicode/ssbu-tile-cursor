@@ -105,6 +105,9 @@ fn native_normal_preview_supports_the_route_through_final_destination() {
 // main+0x1b3304c. All twelve captures agree on clamp, ordered vector and preview.
 const ORDINARY: &[u8; 16 + 118 * 24] = include_bytes!("stage_fixtures/ordinary-sss.bin");
 const ORDINARY_PREVIEW: &[u8; 120] = include_bytes!("stage_fixtures/ordinary-preview.bin");
+const ORDINARY_RB: &[u8; 120] = include_bytes!("stage_fixtures/ordinary-preview-rb.bin");
+const ORDINARY_RO: &[u8; 120] = include_bytes!("stage_fixtures/ordinary-preview-ro.bin");
+const ORDINARY_BF: &[u8; 120] = include_bytes!("stage_fixtures/ordinary-preview-bf.bin");
 
 fn ordinary_layout(bytes: &[u8], count: usize) -> Option<crate::layout::Layout> {
     let word = |i: usize| u64::from_le_bytes(bytes[i..i + 8].try_into().unwrap());
@@ -128,6 +131,70 @@ fn ordinary_stock_grid_is_distinct_and_checks_every_row_and_clamp() {
 }
 
 #[test]
+fn ordinary_random_form_controls_qualify_with_their_native_preview() {
+    use crate::layout::Layout;
+
+    let layout = ordinary_layout(ORDINARY, 118).unwrap();
+    let kind = |panel: usize| {
+        let offset = 16 + panel * 24;
+        u64::from_le_bytes(ORDINARY[offset..offset + 8].try_into().unwrap())
+    };
+    let mut rb = facts(ORDINARY_RB, 1, kind(1));
+    let mut ro = facts(ORDINARY_RO, 2, kind(2));
+    let mut bf = facts(ORDINARY_BF, 3, kind(3));
+    let mut normal = facts(ORDINARY_PREVIEW, 0, kind(0));
+    rb.layout = layout;
+    ro.layout = layout;
+    bf.layout = layout;
+    normal.layout = layout;
+    assert_eq!(qualified_stage(rb), Some(Stage::RandomBattlefield));
+    assert_eq!(qualified_stage(ro), Some(Stage::RandomOmega));
+    assert_eq!(qualified_stage(bf), Some(Stage::Battlefield));
+
+    let with_form = |mut stage: StageFacts, form| {
+        stage.records[0].form = form;
+        stage
+    };
+    for bad in [
+        with_form(rb, 0),
+        with_form(rb, 2),
+        with_form(ro, 1),
+        with_form(ro, 0),
+        with_form(bf, 1),
+        with_form(normal, 1),
+        StageFacts { layout: Layout::Sss, ..rb },
+        StageFacts { actor_hover: 2, ..rb },
+        StageFacts { getter: 2, ..rb },
+        StageFacts { grid_kind: rb.grid_kind ^ 1, ..rb },
+        StageFacts { records: [rb.records[0]; 3], ..rb },
+    ] {
+        assert_eq!(qualified_stage(bad), None);
+    }
+}
+
+#[test]
+fn reader_preview_form_is_scoped_to_native_ordinary_random_controls() {
+    use crate::layout::Layout;
+
+    let rb = 0x6900_021c_23e8_aab5;
+    let ro = 0x6900_0313_bb95_239c;
+    for (layout, panel, kind, form) in [
+        (Layout::OrdinarySss, 1, rb, 1),
+        (Layout::OrdinarySss, 2, ro, 2),
+        (Layout::Sss, 1, rb, 0),
+        (Layout::Sss, 2, ro, 0),
+        (Layout::Css, 1, rb, 0),
+        (Layout::OrdinarySss, 1, ro, 0),
+        (Layout::OrdinarySss, 2, rb, 0),
+        (Layout::OrdinarySss, 0, 0x6900_0116_6fbc_7641, 0),
+        (Layout::OrdinarySss, 3, 0x6900_0415_4b5c_4392, 0),
+        (Layout::Sss, 0, 0x6900_6d11_6b90_4091, 0),
+    ] {
+        assert_eq!(crate::stage::preview_form(layout, panel, kind), form);
+    }
+}
+
+#[test]
 fn ordinary_random_controls_and_normal_stages_follow_typed_right_steps() {
     use crate::provider::{P1Token, Publisher, Sample};
 
@@ -142,24 +209,29 @@ fn ordinary_random_controls_and_normal_stages_follow_typed_right_steps() {
     let rows = ORDINARY[16..].as_chunks::<24>().0;
     let rects: Vec<_> = rows.iter().map(|r| rect(&r[8..])).collect();
     let route = [
-        ("Random Normal", None),
-        ("Random Battlefield", None),
-        ("Random Omega", None),
-        ("Battlefield", Some(0)),
-        ("Small Battlefield", Some(347)),
-        ("Big Battlefield", Some(2)),
-        ("Final Destination", Some(3)),
+        ("Random Normal", None, "normal"),
+        ("Random Battlefield", None, "normal"),
+        ("Random Omega", None, "normal"),
+        ("Battlefield", Some(0), "normal"),
+        ("Small Battlefield", Some(347), "normal"),
+        ("Big Battlefield", Some(2), "normal"),
+        ("Final Destination", Some(3), "normal"),
     ];
     let mut point = (-189.0, 358.0);
     let mut step = Step::default();
-    for (i, (name, id)) in route.into_iter().enumerate() {
+    for (i, (name, id, form)) in route.into_iter().enumerate() {
         let panel = i as i32;
         let kind = u64::from_le_bytes(rows[i][..8].try_into().unwrap());
-        let mut actor = facts(ORDINARY_PREVIEW, panel, kind);
+        let fixture = match i {
+            1 => ORDINARY_RB,
+            2 => ORDINARY_RO,
+            3 => ORDINARY_BF,
+            _ => ORDINARY_PREVIEW,
+        };
+        let mut actor = facts(fixture, panel, kind);
         actor.layout = layout;
-        // Only panel 0's preview is observed. Model the later landing iff the live
-        // native actor returns the matching Normal preview for that exact panel.
-        if i != 0 {
+        // Panels 4–6 are modeled; their previews were not captured.
+        if i >= 4 {
             actor.records[0] = Preview { kind, panel, form: 0 };
         }
         let stage = qualified_stage(actor).unwrap();
@@ -177,6 +249,7 @@ fn ordinary_random_controls_and_normal_stages_follow_typed_right_steps() {
             for field in [
                 format!("name={name}"),
                 format!("kind={}", id.map_or("unknown".into(), |k| k.to_string())),
+                format!("form={form}"),
                 format!("focus=sss.grid.{}", if id.is_none() { "random" } else { "normal" }),
                 "layout=sss.5008a63ffaa7de18".to_owned(),
                 "settled=1".to_owned(),
