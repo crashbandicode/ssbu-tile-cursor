@@ -298,8 +298,7 @@ fn legacy_sample(which: &str) -> Sample {
 }
 
 fn legacy(sample: Sample) -> String {
-    let mut publisher = Publisher::default();
-    publisher.revision = 856;
+    let mut publisher = Publisher { revision: 856, ..Publisher::default() };
     let mut bytes = Vec::new();
     publisher.poll(1, Some(sample), |value| { bytes.extend_from_slice(value); true });
     String::from_utf8(bytes).unwrap().lines().take(43).collect::<Vec<_>>().join("\n")

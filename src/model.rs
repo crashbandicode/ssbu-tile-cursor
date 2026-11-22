@@ -1050,7 +1050,7 @@ mod tests {
             &cpu_guards::CSS_GRAB_HOVER_TOKEN,
         ];
         let heads = include_bytes!("layouts/cpu-guard-heads.bin");
-        for (site, head) in optional.into_iter().zip(heads.chunks_exact(8)) {
+        for (site, head) in optional.into_iter().zip(heads.as_chunks::<8>().0) {
             assert_eq!(&site.guard[..8], head, "{}", site.name);
         }
         // The query site is followed by the call it feeds: bl 0x3763840.
