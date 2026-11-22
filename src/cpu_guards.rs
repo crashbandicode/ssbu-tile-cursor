@@ -1,6 +1,12 @@
 // Extracted from the owned 13.0.5 ELF; see the CPU coin guard receipt.
 use super::Site;
 
+pub const CSS_TAKE: Site = Site { name: "css_take", offset: 0x1a14664, guard: [0; 64] };
+pub const CSS_TAKE_PRESS: Site = Site { name: "css_take_press", offset: 0x1a14654, guard: [0; 64] };
+pub const CSS_TAKE_OWN: Site = Site { name: "css_take_own", offset: 0x1a14a00, guard: [0; 64] };
+pub const CSS_TAKE_GATE: Site = Site { name: "css_take_gate", offset: 0x1a145c4, guard: [0; 64] };
+pub const TAKE_SITES: [&Site; 4] = [&CSS_TAKE, &CSS_TAKE_PRESS, &CSS_TAKE_OWN, &CSS_TAKE_GATE];
+
 pub const CSS_MEDAL_COUNT: Site = Site {
     name: "css_medal_count",
     offset: 0x1a2f138,

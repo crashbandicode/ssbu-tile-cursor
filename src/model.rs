@@ -278,11 +278,33 @@ pub mod input {
 }
 
 /// `nn::hid` button bits.
+pub const BUTTON_B: u64 = 1 << 1;
 pub const BUTTON_L3: u64 = 1 << 4;
 pub const BUTTON_LEFT: u64 = 1 << 12;
 pub const BUTTON_UP: u64 = 1 << 13;
 pub const BUTTON_RIGHT: u64 = 1 << 14;
 pub const BUTTON_DOWN: u64 = 1 << 15;
+
+/// The CPU's coin slot on Training's two-seat fighter select.
+pub const CPU_SLOT: usize = 1;
+
+/// L3 + B presses: B going down while L3 is down, on the newest pad sample of each fighter-select update.
+/// The first update only primes.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct TakePress {
+    primed: bool,
+    b_down: bool,
+}
+
+impl TakePress {
+    pub const fn new() -> Self {
+        Self { primed: false, b_down: false }
+    }
+
+    pub fn update(&mut self, _buttons: u64) -> bool {
+        false
+    }
+}
 
 pub const TICKS_PER_SECOND: u64 = 19_200_000;
 /// The first step fires on the press; held, it repeats every 15 subsequent
@@ -624,6 +646,29 @@ pub struct Coins {
     pub at: [Option<(f32, f32)>; css::SLOTS],
 }
 
+/// What the game's B handler does for one player's B press with an empty hand (`.text+0x1a14664`).
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum Take {
+    /// Not P1's L3 + B on Training's two-seat fighter select: the game's own B.
+    Native,
+    /// L3 + B there, but the game does not offer the CPU's coin now: B does nothing.
+    Nothing,
+    /// L3 + B there: the game's own pick-up runs for this coin slot.
+    Coin(usize),
+}
+
+/// `l3`: L3 is down on P1's pad. `player`: the index of the player whose B press the game is handling.
+/// `coins`: the coins the game offers P1's empty hand on Training's two-seat fighter select; `None` anywhere
+/// else (another select, a coin in the hand, a hidden or disabled hand).
+pub fn take(_l3: bool, _player: i32, _coins: Option<&Coins>) -> Take {
+    Take::Native
+}
+
+/// The coin slot and own-coin gate in w21 and w9.
+pub fn take_registers(_take: Take, pointed: u32, own: u32) -> (u32, u32) {
+    (pointed, own)
+}
+
 pub struct CoinFacts {
     pub flags: [u8; 8],
     pub rest: [(f32, f32); 2],
@@ -847,6 +892,11 @@ pub const EV_STEP: u8 = 2;
 pub const EV_SETTLED: u8 = 3;
 pub const EV_BLOCKED: u8 = 4;
 pub const EV_TOKEN: u8 = 5;
+pub const EV_TAKE: u8 = 6;
+
+pub fn pack_take(screen: Screen, _slot: usize) -> (u64, u64) {
+    (screen.code(), 0)
+}
 
 const NONE16: u64 = 0xffff;
 
@@ -1017,6 +1067,10 @@ pub fn describe(event: &RawEvent, out: &mut impl fmt::Write) -> fmt::Result {
 }
 
 #[cfg(test)]
+#[path = "take_tests.rs"]
+pub(crate) mod take_tests;
+
+#[cfg(test)]
 mod tests {
     use super::*;
     use core::fmt::Write as _;
@@ -1080,6 +1134,21 @@ mod tests {
             "not LDR/STR imm: {word:#x}"
         );
         (((word >> 10) & 0xfff) << (word >> 30)) as usize
+    }
+
+    #[test]
+    fn the_take_sites_hold_the_instructions_the_hook_relies_on() {
+        use cpu_guards::{CSS_TAKE, CSS_TAKE_GATE, CSS_TAKE_OWN, CSS_TAKE_PRESS};
+        assert_eq!(word(&CSS_TAKE, 0), 0x3100_06bf);
+        assert_eq!(load_store_offset(word(&CSS_TAKE_PRESS, 1)), 0x1ac);
+        assert_eq!(load_store_offset(word(&CSS_TAKE_PRESS, 3)), css::PLAYER_HOVER_TOKEN);
+        assert_eq!(word(&CSS_TAKE_PRESS, 4), word(&CSS_TAKE, 0));
+        assert_eq!(load_store_offset(word(&CSS_TAKE_OWN, 1)), css::PLAYER_INDEX);
+        assert_eq!(load_store_offset(word(&CSS_TAKE_OWN, 3)), 0xf68);
+        assert_eq!(load_store_offset(word(&CSS_TAKE_GATE, 0)), css::PLAYER_INDEX);
+        assert_eq!(load_store_offset(word(&CSS_TAKE_GATE, 3)), css::MEDALS);
+        assert_eq!(word(&CSS_TAKE_GATE, 4), 0x5280_260c);
+        assert_eq!(load_store_offset(word(&CSS_TAKE_GATE, 6)), 0x11b);
     }
 
     #[test]

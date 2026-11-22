@@ -1392,7 +1392,7 @@ fn blocked_counter_is_appended_and_survives_owner_changes() {
     let a = block(&mut Publisher::default(), 1, Some(original), true);
     let b = block(&mut Publisher::default(), 1, Some(changed), true);
     assert_eq!(a.lines().take(42).collect::<Vec<_>>(), b.lines().take(42).collect::<Vec<_>>());
-    assert_eq!(b.lines().count(), 56);
+    assert_eq!(b.lines().count(), 58);
     assert_eq!(b.lines().nth(42), Some("blocked=2"));
     changed.step.new_owner();
     assert_eq!(changed.step.blocked, 2);
