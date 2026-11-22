@@ -531,21 +531,12 @@ cpu.placed.kind=unknown
 cpu.placed.name=unknown
 cpu.placed.form=unknown
 carried.kind=84
-test provider::cpu_tests::the_cpu_pick_wire_fixture_is_current ... FAILED
 carried.name="Banjo & Kazooie"
-
-failures:
 carried.form=default
-
 target.token=none
-failures:
 token.settled=0
-    provider::cpu_tests::the_cpu_pick_wire_fixture_is_current
 take.ack=0
-
-test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 121 filtered out; finished in 0.00s
 take.applied=0
-
 
 ### placed
 schema=tile.cursor/1
