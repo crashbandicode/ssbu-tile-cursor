@@ -89,6 +89,15 @@ pub fn actor_code_matches(code: &[u8]) -> bool {
             == 0x8b59_26a8_6bad_684e
 }
 
+/// Native preview forms from capture tc1, trace SHA-256 prefix 4ffa15f7.
+pub fn preview_form(layout: Layout, panel: i32, kind: u64) -> i32 {
+    match (layout, panel, kind) {
+        (Layout::OrdinarySss, 1, 0x6900_021c_23e8_aab5) => 1,
+        (Layout::OrdinarySss, 2, 0x6900_0313_bb95_239c) => 2,
+        _ => 0,
+    }
+}
+
 pub fn qualified_stage(s: StageFacts) -> Option<Stage> {
     let p = s.records[0];
     if s.tab != 0
@@ -96,7 +105,7 @@ pub fn qualified_stage(s: StageFacts) -> Option<Stage> {
         || s.getter != s.actor_hover
         || s.getter != p.panel
         || p.kind != s.grid_kind
-        || p.form != 0
+        || p.form != preview_form(s.layout, p.panel, p.kind)
         || s.records[1..]
             .iter()
             .any(|other| other.kind != 0x69ff_ff00_0000_0000)

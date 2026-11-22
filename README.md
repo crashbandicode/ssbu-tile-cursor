@@ -86,11 +86,14 @@ the observed rightward edges Training → Battlefield → Small Battlefield.
 On the offline Training route, the active stage actor on the Normal tab must
 agree with its single slot-zero native preview, typed tile, form and the current
 hand. The covered panels are Training, Battlefield, Small Battlefield, Big
-Battlefield and Final Destination. From a qualified rest, the next applied
-step can report `sss.grid.moving` until the hand and live actor agree on the
-settled tile. The runner independently checks the committed Training stage
-scene. An ambiguous medal, another occupied preview slot or a non-Normal form
-clears actionable stage fields. A stale owner expires after 300 ms.
+Battlefield and Final Destination. The ordinary Smash grid also covers the
+three Random controls and those four normal stages. From a qualified rest, the
+next applied step can report `sss.grid.moving` until the hand and live actor
+agree on the settled tile. The runner independently checks the committed
+Training stage scene. An ambiguous medal, another occupied preview slot or an
+unexpected preview form clears actionable stage fields; Random Battlefield
+and Random Omega require their native forms 1 and 2. A stale owner expires
+after 300 ms.
 
 ## Build
 

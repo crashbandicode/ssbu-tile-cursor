@@ -279,7 +279,7 @@ pub(super) unsafe fn finish(owner: u64, sample: &mut Sample) -> bool {
     if s.invalid_getter
         || tok == P1Token::Unknown
         || (layout == crate::layout::Layout::OrdinarySss && tok != P1Token::Held)
-        || rec[0].form != 0
+        || rec[0].form != crate::stage::preview_form(layout, rec[0].panel, rec[0].kind)
         || rec[1..].iter().any(|p| p.kind != INVALID_KIND)
     {
         s.last_rest = None;
