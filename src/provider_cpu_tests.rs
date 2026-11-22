@@ -132,6 +132,26 @@ fn the_cpu_medal_reports_its_tile_and_fighter() {
 }
 
 #[test]
+fn cpu_lines_are_unknown_outside_trainings_two_seat_select() {
+    lines(&wire(sample()), &["cpu.token=placed"]);
+    let expected = [
+        "cpu.token=unknown", "cpu.placed.at=unknown", "cpu.placed.kind=unknown",
+        "cpu.placed.name=unknown", "cpu.placed.form=unknown",
+        "p1.coin=placed", "p1.coin.at=67",
+    ];
+    let actual: Vec<Vec<String>> = [Some(1), None].into_iter().map(|local_seat| {
+        let value = wire(Sample { local_seat, ..sample() });
+        expected.iter().map(|wanted| {
+            let key = wanted.split_once('=').unwrap().0;
+            value.lines().find(|line| line.split_once('=').map(|x| x.0) == Some(key))
+                .unwrap_or("").to_owned()
+        }).collect()
+    }).collect();
+    let expected: Vec<_> = expected.iter().map(|value| (*value).to_owned()).collect();
+    assert_eq!(actual, [expected.clone(), expected]);
+}
+
+#[test]
 fn coins_are_offered_by_the_games_own_test() {
     let valid = measured_facts();
     assert_eq!(coin_offer(1, &valid, area()), Some((576.0, -77.0)));
