@@ -17,6 +17,14 @@
    first press while the hand may step is the step (`to=<n>`, or `to=none` at an edge); every other press is
    counted and logged as `blocked`.
 
+## The `blocked` line (TC-BLOCKED-LOG)
+
+- The log line `blocked screen=… dir=… presses=<n>` and the state line `blocked=<n>` carry the restriction tag
+  `TC-BLOCKED-LOG` (`src/model.rs`, the two lines that write it; `docs/RESTRICTIONS.md`).
+- They log an existing rule: an L3 + direction press does nothing while the hand may not step, or once that
+  update has taken its one step. They add no restriction and change no input. The label was not renamed.
+- The tag follows the primary's compliance ruling of 2026-11-22; it is not a separate operator approval.
+
 ## Release NRO
 
 - 98,304 bytes, SHA-256 `21f6b629767764216e9cb9b1b75975c89cbc1909b93ec8cc0864126b1ba03179`,
@@ -57,8 +65,11 @@ Under `smash-training-lobby/artifacts/phase23/`:
 
 ## Open
 
-- Compliance: the reviewed sheet in the newest gate folder lists the manual rows nobody has verified yet. Clean
-  compliance is required before a card install.
+- Compliance: the checker exits 0 (`tile-cursor-state/gate-16d95d6/compliance-final/`, with the design trace
+  `DESIGN-TRACE.md`). Four manual rows are recorded there as not met: the scoring scripts beside the evidence have
+  no unit tests; one early build shared a target directory with another source copy; some early local commands
+  ran without the memory and time guard; no model watcher was armed. Whether they stand in the way of a card
+  install is the primary's decision.
 - The route macros hold L3 + direction for two frames; a longer hold is a playbook decision, not made here.
 - The README clips predate this branch.
 
