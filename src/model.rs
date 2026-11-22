@@ -462,16 +462,16 @@ enum Prev {
     Blocked,
 }
 
-/// The sample ring only ever adds samples that arrived between two consecutive
-/// steppable callbacks of the same hand (screen, picker object, cursor) on
-/// the same pad source. Each update examines every sample it takes exactly once,
-/// in that update, and every press among them gets exactly one outcome in that
-/// same update. The first press of an update in which the hand may step is the
-/// step. Every other press is counted as blocked: the hand may not step, or
-/// this update already stepped. Nothing is carried to a later update. A hold
-/// frame is counted at most once per update, and only in an update that brought
-/// no press, so a hold repeat comes 15 updates after its press for steps and
-/// for blocked alike.
+/// Pad history is read only between consecutive callbacks of the same hand (screen, picker
+/// object, cursor) on the same pad source; after a gap, a new hand, a pad change, or on the
+/// first callback in which the hand may step again, only the newest sample counts. Each update
+/// examines every sample it takes exactly once and every press among them gets exactly one
+/// outcome in that same update. The first press of an update in which the hand may step is
+/// the step. Every other press is counted as blocked: the hand may not step, or this update
+/// already stepped. So two taps within one update give one step plus one blocked, never a
+/// deferred second step. Nothing is carried to a later update. A hold frame is counted at
+/// most once per update, and only in an update that brought no press, so a hold repeat comes
+/// 15 updates after its press for steps and for blocked alike.
 pub struct PadInput {
     owner: Option<PadOwner>,
     source: Option<PadSource>,

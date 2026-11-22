@@ -35,12 +35,13 @@ drawn on the clips from the run's own input log.
   on the same pad source: after a missing view, a new hand or a pad change, and
   on the first update in which the hand may step again, only the newest sample
   counts. Each press among the samples taken gets one outcome in that update;
-  nothing is carried over. Extra presses and presses while the hand may not step
-  are logged as `blocked … presses=<n>` and counted in `blocked=` (see
-  docs/RESTRICTIONS.md: this logs an existing rule). Mixed directions use
-  `dir=mixed presses=<n> up=<n> …` with only non-zero directions listed. The state
-  counters (`ack`, `applied`, `blocked`) are authoritative; `events.log` is
-  written through a 64-event ring and is best-effort.
+  nothing is carried over. Two taps within one update therefore give one step
+  and one `blocked`, never a deferred second step. Extra presses and presses
+  while the hand may not step are logged as `blocked … presses=<n>` and counted
+  in `blocked=` (see docs/RESTRICTIONS.md: this logs an existing rule). Mixed
+  directions use `dir=mixed presses=<n> up=<n> …` with only non-zero directions
+  listed. The state counters (`ack`, `applied`, `blocked`) are authoritative;
+  `events.log` is written through a 64-event ring and is best-effort.
 - Character select: steps only while the hand carries a token (P1's or a
   CPU's). With an empty hand nothing happens; press B to take the token back.
 - Without L3 the D-pad and stick behave as in the unmodified game. Nothing
