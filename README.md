@@ -44,6 +44,12 @@ drawn on the clips from the run's own input log.
   `events.log` is written through a 64-event ring and is best-effort.
 - Character select: steps only while the hand carries a token (P1's or a
   CPU's). With an empty hand nothing happens; press B to take the token back.
+- State block: `observation.active=0` means the newest sample is older than
+  0.3 s or the screen has no P1 view; a sample is never inactive merely because
+  it was stamped after the publisher read the clock. A placed or hovered fighter
+  is identified by the game's own lookup: a set variant flag on the panel selects
+  the tile's alternate only if the tile has one (Pyra/Mythra), so an echo fighter
+  restored on re-entry (Richter after Training) reads `placed` with its name.
 - Without L3 the D-pad and stick behave as in the unmodified game. Nothing
   happens outside these two screens.
 

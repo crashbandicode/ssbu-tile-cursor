@@ -3,8 +3,8 @@
 ## Branch and commits
 
 - `tile/state-moving`, based on `tile/random-panels` 75a90e3, which is based on `tile/css-sss` 2f0a56c.
-- Behaviour head: 66bad13. The commits after it change comments, docs and the Cargo feature list only
-  (`git log 66bad13..`). Not pushed, not merged, no tag.
+- Behaviour commits: 66bad13 (pad input) and the state fix of 2026-11-22 that follows 908ba92 (item 4 below).
+  The commits between them change comments, docs and the Cargo feature list only. Not pushed, not merged, no tag.
 
 ## What the branch adds to 2f0a56c
 
@@ -16,6 +16,15 @@
    between two updates can still step. Every press among the samples taken gets one outcome in that update: the
    first press while the hand may step is the step (`to=<n>`, or `to=none` at an edge); every other press is
    counted and logged as `blocked`.
+4. State fix after bridge load 8 (two defects of the published block):
+   - A sample the owner stamped after the publisher's clock reading was published as inactive
+     (`observation.active=0`, every field unknown) for one publish, about 100 ms. Such a sample is newer than the
+     reading; it now counts as age 0. The 0.3 s staleness bound is unchanged.
+   - A fighter whose panel carries a variant flag (`panel+0x6be` / `+0x6bf`) was never qualified. The game rebuilds
+     the panel with `+0x6be = 1` for an echo fighter when the fighter select is re-entered, so a placed Richter
+     read `p1.token=unknown` after Training. The plugin now applies the game's own lookup rule (`.text+0x19f1fa0`):
+     a set flag selects the tile's alternate word only when that word is a valid typed hash; otherwise the fighter
+     is the tile's default and qualifies.
 
 ## The `blocked` line (TC-BLOCKED-LOG)
 
@@ -27,9 +36,10 @@
 
 ## Release NRO
 
-- 98,304 bytes, SHA-256 `21f6b629767764216e9cb9b1b75975c89cbc1909b93ec8cc0864126b1ba03179`,
-  build ID `9e9b38df8faf7c26b56291d089da72e2d25f5644f2353abec0920fd8220fcd45`. Built from 66bad13; the later
-  commits were gated to reproduce it byte for byte.
+- The release NRO of the head commit, with its size, SHA-256 and build ID, is recorded in that commit's gate
+  folder (`tile-cursor-state/gate-<sha7>/nro-identity.json`).
+- The previous release (66bad13 to 908ba92, byte-identical): 98,304 bytes, SHA-256
+  `21f6b629767764216e9cb9b1b75975c89cbc1909b93ec8cc0864126b1ba03179`. It has the two defects of item 4.
 
 ## Evidence
 
@@ -42,7 +52,8 @@ Under `smash-training-lobby/artifacts/phase23/`:
 - `tile-cursor-state/top-edge-d24a61f/te1`: 108 route presses on d24a61f, 14 without an outcome.
 - `tile-cursor-state/top-edge-9f828a5/te2`, `te3`: the same presses, 108 of 108, on two hosts.
 - `tile-cursor-state/top-edge-03bd88c/te4`, `top-edge-66bad13/te5`: 108 of 108 and the `blocked` path; te5 is on
-  the release NRO above.
+  the previous release NRO.
+- `tile-cursor-state/load8/`: the analysis of the two load-8 defects and the Eden check of item 4.
 - Reviews are in `INBOX-opus-rc6-integration.md` (review-games-astra-3, 2026-11-22 08:43:02Z and 09:01:33Z).
 
 ## Live state
@@ -59,6 +70,10 @@ Under `smash-training-lobby/artifacts/phase23/`:
 - After a missing view, a new hand, a pad change, or on the first update in which the hand may step again, only
   the newest sample is used.
 - Two presses inside one update give one step and one `blocked`.
+- A panel that resolves to its tile's alternate word (Pyra/Mythra's second fighter) is not qualified: the token
+  and the fighter identity read unknown there.
+- A block is inactive when the newest sample is older than 0.3 s at the publisher's clock reading, or when the
+  owner callback had no view. That is the only meaning of `observation.active=0`.
 - On the ordinary fighter select the state block has `seat` and `layout` unknown (seen in boot ts1; not
   investigated).
 - Stage-select panels 4 to 6 of the ordinary grid are modelled in the host tests, not captured.

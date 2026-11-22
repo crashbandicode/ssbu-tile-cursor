@@ -212,19 +212,25 @@ impl Fighter {
     }
 }
 
+/// The game's lookup at .text+0x19f1fa0 selects the alternate only when the panel's variant flag is
+/// set and the alternate is a valid typed hash. A panel resolving to the tile's default word is
+/// qualified; one resolving to the alternate (Pyra/Mythra's second fighter) is not.
 pub fn fighter_identity(
     index: u16,
     panel: u64,
-    tile: u64,
+    tile: [u64; 2],
     variant: [u8; 2],
     settled: bool,
 ) -> Option<Fighter> {
+    let [word, alternate] = tile;
+    let selects_alternate =
+        variant != [0, 0] && alternate >> 56 == 0xc1 && alternate & 0xff_ffff_ffff != 0;
     (settled
-        && variant == [0, 0]
-        && panel == tile
+        && !selects_alternate
+        && panel == word
         && CSS_TILES
             .get(usize::from(index))
-            .is_some_and(|record| record.word == tile)
+            .is_some_and(|record| record.word == word)
     )
         .then_some(Fighter(index))
 }
@@ -453,8 +459,8 @@ impl Publisher {
             self.cached = s;
         }
         let s = self.cached;
-        let active =
-            s.screen.is_some() && now.checked_sub(s.tick).is_some_and(|age| age <= MAX_AGE);
+        // A sample stamped after this clock reading is newer than the reading, so its age is zero.
+        let active = s.screen.is_some() && now.saturating_sub(s.tick) <= MAX_AGE;
         let identity = (s.observation, active);
         if self.sent == Some(identity) {
             return;

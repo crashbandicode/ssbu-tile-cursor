@@ -96,10 +96,10 @@ pub(super) unsafe fn collect(css: u64, view: &View, sample: &mut Sample) {
         if i >= view.tiles.count {
             return None;
         }
-        // The default-variant branch at 0x19f2014 reads the first u64 in this
-        // same 0xb0-stride vector. Other variants have not been qualified.
-        let word = read_u64(view.tiles.begin + u64::from(index) * view.tiles.stride);
-        fighter_identity(index, panel_kind, word, variant, stable)
+        // The lookup at 0x19f1fa0 reads the default word at +0 and, for a set
+        // variant flag, the alternate at +8 of this same 0xb0-stride vector.
+        let base = view.tiles.begin + u64::from(index) * view.tiles.stride;
+        fighter_identity(index, panel_kind, [read_u64(base), read_u64(base + 8)], variant, stable)
     };
     let index = u16::try_from(read_i32(medal + 0x1c))
         .ok()
