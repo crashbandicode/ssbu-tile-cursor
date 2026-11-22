@@ -64,6 +64,9 @@ continue to handle cursor movement when initial registration is absent.
 The provider distinguishes movement attempts (`ack`), successful target
 writes (`applied`), and the handled step that reached its native hover
 (`settled.ack`). `p1.carried` is the native slot-zero hand's carried token.
+`phase` is `unknown`, `moving`, `resting` or `settled`. `target.at`,
+`target.kind` and `target.name` identify the tile at the native target point
+and its stock identity, not the live preview.
 On CSS, `kind`, `name` and `form` require a settled carried P1 token and
 agreement between its native hover, the default tile identity and the
 slot-zero panel. The qualified default Steve preview is app fighter 88.

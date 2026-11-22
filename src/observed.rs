@@ -226,6 +226,7 @@ pub(super) unsafe fn observe(screen: Screen, object: u64, view: Option<View>) {
     let current = read_point(view.cursor + cursor::CURRENT as u64);
     let target = read_point(view.cursor + cursor::TARGET as u64);
     sample.at = tile_at(&view.tiles, current).map(|i| i as u16);
+    sample.target = tile_at(&view.tiles, target).map(|i| i as u16);
     sample.p1_carried = view.token.map(|i| i as u16);
     if screen == Screen::Css && sample.p1_carried != previous_token {
         // A placed or reacquired token begins a new action scope on the same layout.

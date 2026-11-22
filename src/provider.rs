@@ -286,6 +286,7 @@ pub struct Sample {
     pub css_entry: bool,
     pub hand_steppable: bool,
     pub at: Option<u16>,
+    pub target: Option<u16>,
     pub hover: Option<u16>,
     pub p1_carried: Option<u16>,
     pub local_seat: Option<u8>,
@@ -318,6 +319,7 @@ impl Owner {
                 css_entry: false,
                 hand_steppable: false,
                 at: None,
+                target: None,
                 hover: None,
                 p1_carried: None,
                 local_seat: None,
@@ -618,6 +620,37 @@ impl Publisher {
             buf, "\nsettled={}\napplied={}\ndirection={}\nfrom={}\nto={}\nresult={result}\nsettled.ack={}",
             u8::from(settled), step.applied, Field(p1_view.then_some(step.dir).flatten().map(Dir::name)),
             endpoint(step.from), endpoint(step.to), Field(step_still_matches.then_some(step.settled_ack).flatten())
+        );
+        let phase = if !p1_view {
+            "unknown"
+        } else if !s.resting {
+            "moving"
+        } else if settled
+            && (!(css_grid && s.p1_token == P1Token::Held && s.p1_carried == Some(0) && !entry)
+                || hovered.is_some())
+        {
+            "settled"
+        } else {
+            "resting"
+        };
+        let target_css = (p1_view && s.screen == Some(Screen::Css) && s.grid == Some(Layout::Css))
+            .then_some(s.target)
+            .flatten()
+            .and_then(|i| CSS_TILES.get(usize::from(i)));
+        let target_stage = (p1_view && s.screen == Some(Screen::Sss))
+            .then_some(s.grid.zip(s.target))
+            .flatten()
+            .and_then(|(layout, panel)| crate::stage::stock_stage(layout, panel));
+        let target = match (p1_view, s.target) {
+            (true, Some(i)) => Endpoint::Index(i),
+            (true, None) => Endpoint::None,
+            _ => Endpoint::Unknown,
+        };
+        let _ = write!(
+            buf, "\nphase={phase}\ntarget.at={target}\ntarget.kind={}\ntarget.name={}",
+            Field(target_css.and_then(|tile| tile.kind).or_else(|| target_stage.and_then(crate::stage::Stage::id))),
+            Field(target_css.map(|tile| PublishedName(tile.name, true))
+                .or_else(|| target_stage.map(|stage| PublishedName(stage.name(), false))))
         );
         if buf.as_bytes().len() < 1024 && send(buf.as_bytes()) {
             self.revision = rev;

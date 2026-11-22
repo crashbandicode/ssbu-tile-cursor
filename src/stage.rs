@@ -58,6 +58,24 @@ impl Stage {
     }
 }
 
+pub fn stock_stage(layout: Layout, panel: u16) -> Option<Stage> {
+    match (layout, panel) {
+        (Layout::OrdinarySss, 0) => Some(Stage::RandomNormal),
+        (Layout::OrdinarySss, 1) => Some(Stage::RandomBattlefield),
+        (Layout::OrdinarySss, 2) => Some(Stage::RandomOmega),
+        (Layout::OrdinarySss, 3) => Some(Stage::Battlefield),
+        (Layout::OrdinarySss, 4) => Some(Stage::SmallBattlefield),
+        (Layout::OrdinarySss, 5) => Some(Stage::BigBattlefield),
+        (Layout::OrdinarySss, 6) => Some(Stage::FinalDestination),
+        (Layout::Sss, 0) => Some(Stage::Training),
+        (Layout::Sss, 1) => Some(Stage::Battlefield),
+        (Layout::Sss, 2) => Some(Stage::SmallBattlefield),
+        (Layout::Sss, 3) => Some(Stage::BigBattlefield),
+        (Layout::Sss, 4) => Some(Stage::FinalDestination),
+        _ => None,
+    }
+}
+
 #[derive(Clone, Copy)]
 pub struct Preview {
     pub kind: u64,
