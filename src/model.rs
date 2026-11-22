@@ -358,24 +358,77 @@ impl Repeater {
 
     /// Called exactly once per CSS/SSS frame by the screen hook.
     pub fn update(&mut self, buttons: u64) -> Option<Dir> {
-        let dir = if buttons & BUTTON_L3 != 0 {
-            Dir::from_buttons(buttons)
-        } else {
-            None
-        };
-        if dir != self.held {
-            self.held = dir;
-            self.remaining = REPEAT_FRAMES;
-            return dir;
+        self.feed(&[buttons]).0
+    }
+
+    pub fn feed(&mut self, samples: &[u64]) -> (Option<Dir>, usize) {
+        for (index, &buttons) in samples.iter().enumerate() {
+            let dir = if buttons & BUTTON_L3 != 0 {
+                Dir::from_buttons(buttons)
+            } else {
+                None
+            };
+            if dir != self.held {
+                self.held = dir;
+                self.remaining = REPEAT_FRAMES;
+                if dir.is_some() {
+                    return (dir, index + 1);
+                }
+            }
         }
-        if dir.is_some() {
+        if self.held.is_some() {
             self.remaining -= 1;
             if self.remaining == 0 {
                 self.remaining = REPEAT_FRAMES;
-                return dir;
+                return (self.held, samples.len());
             }
         }
-        None
+        (None, samples.len())
+    }
+}
+
+pub const PAD_RING: usize = 16;
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct PadTracker {
+    last: Option<i64>,
+}
+
+impl PadTracker {
+    pub const fn new() -> Self {
+        Self { last: None }
+    }
+
+    pub fn unseen(&self, ring: &[(i64, u64)], out: &mut [(i64, u64); PAD_RING]) -> usize {
+        let Some(&newest) = ring.first() else {
+            return 0;
+        };
+        let Some(last) = self.last else {
+            out[0] = newest;
+            return 1;
+        };
+        let mut valid = 1;
+        while valid < ring.len().min(PAD_RING) && ring[valid].0 < ring[valid - 1].0 {
+            valid += 1;
+        }
+        let mut count = 0;
+        for &sample in ring[..valid].iter().rev() {
+            if sample.0 > last {
+                out[count] = sample;
+                count += 1;
+            }
+        }
+        count
+    }
+
+    pub fn consume(&mut self, batch: &[(i64, u64)], used: usize) {
+        if used > 0 {
+            self.last = Some(batch[used - 1].0);
+        }
+    }
+
+    pub fn reset(&mut self) {
+        self.last = None;
     }
 }
 
@@ -601,6 +654,7 @@ pub struct RawEvent {
 pub const EV_SCREEN: u8 = 1;
 pub const EV_STEP: u8 = 2;
 pub const EV_SETTLED: u8 = 3;
+pub const EV_BLOCKED: u8 = 4;
 
 const NONE16: u64 = 0xffff;
 
@@ -647,6 +701,10 @@ pub fn pack_step(screen: Screen, dir: Dir, step: &Step, token: Option<usize>) ->
             | pack_index(token) << 48,
         pack_point(step.target),
     )
+}
+
+pub fn pack_blocked(screen: Screen, dir: Dir) -> (u64, u64) {
+    (screen.code() | u64::from(dir.code()) << 8, 0)
 }
 
 /// ` token=p<n>` for a carried token's slot (`p1` = P1's own); nothing when
@@ -699,6 +757,10 @@ pub fn describe(event: &RawEvent, out: &mut impl fmt::Write) -> fmt::Result {
                 Index(a >> 32 & 0xffff),
                 Token(a >> 48 & 0xffff)
             )
+        }
+        EV_BLOCKED => {
+            let dir = Dir::from_code((a >> 8) as u8).map_or("unknown", Dir::name);
+            write!(out, "blocked screen={screen} dir={dir}")
         }
         EV_SETTLED => {
             let (x, y) = unpack_point(b);

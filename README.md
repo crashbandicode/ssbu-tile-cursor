@@ -31,6 +31,9 @@ drawn on the clips from the run's own input log.
 
 - One step per press. Holding the combination repeats every 15 game frames
   (250 ms at 60 fps). The cursor stops at the edges.
+- The pad's recent samples are read so a chord shorter than the gap between
+  two updates still steps once. A chord pressed while the hand may not step is
+  logged as `blocked` and counted in `blocked=`.
 - Character select: steps only while the hand carries a token (P1's or a
   CPU's). With an empty hand nothing happens; press B to take the token back.
 - Without L3 the D-pad and stick behave as in the unmodified game. Nothing
@@ -61,7 +64,7 @@ first poll registered successfully and the full 13.0.5 build note matches. A
 later registration can expose an inactive block. The standalone callbacks
 continue to handle cursor movement when initial registration is absent.
 
-The provider distinguishes movement attempts (`ack`), successful target
+The provider distinguishes movement attempts (`ack`), blocked chords (`blocked`), successful target
 writes (`applied`), and the handled step that reached its native hover
 (`settled.ack`). `p1.carried` is the native slot-zero hand's carried token.
 `phase` is `unknown`, `moving`, `resting` or `settled`. `target.at`,

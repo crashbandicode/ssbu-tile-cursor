@@ -93,6 +93,7 @@ impl Registered {
 #[derive(Default, Debug, Clone, Copy, Eq, PartialEq)]
 pub struct Step {
     pub ack: u64,
+    pub blocked: u64,
     pub applied: u64,
     pub dir: Option<Dir>,
     pub from: Option<u16>,
@@ -135,6 +136,7 @@ impl Step {
     pub(crate) fn new_owner(&mut self) {
         *self = Self {
             ack: self.ack,
+            blocked: self.blocked,
             applied: self.applied,
             ..Self::default()
         };
@@ -329,6 +331,7 @@ impl Owner {
                 resting: false,
                 step: Step {
                     ack: 0,
+                    blocked: 0,
                     applied: 0,
                     dir: None,
                     from: None,
@@ -647,10 +650,11 @@ impl Publisher {
             _ => Endpoint::Unknown,
         };
         let _ = write!(
-            buf, "\nphase={phase}\ntarget.at={target}\ntarget.kind={}\ntarget.name={}",
+            buf, "\nphase={phase}\ntarget.at={target}\ntarget.kind={}\ntarget.name={}\nblocked={}",
             Field(target_css.and_then(|tile| tile.kind).or_else(|| target_stage.and_then(crate::stage::Stage::id))),
             Field(target_css.map(|tile| PublishedName(tile.name, true))
-                .or_else(|| target_stage.map(|stage| PublishedName(stage.name(), false))))
+                .or_else(|| target_stage.map(|stage| PublishedName(stage.name(), false)))),
+            step.blocked
         );
         if buf.as_bytes().len() < 1024 && send(buf.as_bytes()) {
             self.revision = rev;

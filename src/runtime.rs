@@ -11,9 +11,9 @@
 //! stack, and the counting allocator below reports the plugin's heap
 //! allocations (expected 0) in the log.
 use crate::model::{
-    self, cursor, describe, hand, input, neighbour, pack_screen, pack_settled, pack_step, tile_at,
-    Line, RawEvent, Rect, Repeater, Screen, Site, Tiles, BUTTON_L3, EV_SCREEN, EV_SETTLED, EV_STEP,
-    TICKS_PER_SECOND,
+    self, cursor, describe, hand, input, neighbour, pack_blocked, pack_screen, pack_settled,
+    pack_step, tile_at, Line, PadTracker, RawEvent, Rect, Repeater, Screen, Site, Tiles, BUTTON_L3,
+    EV_BLOCKED, EV_SCREEN, EV_SETTLED, EV_STEP, PAD_RING, TICKS_PER_SECOND,
 };
 use core::cell::UnsafeCell;
 use core::fmt::Write as _;
@@ -91,10 +91,17 @@ static EVENT_HEAD: AtomicU64 = AtomicU64::new(0);
 /// P1's hand cursor as last seen by a screen hook, and until when that holds.
 static LIVE_CURSOR: AtomicU64 = AtomicU64::new(0);
 static LIVE_UNTIL: AtomicU64 = AtomicU64::new(0);
+static PAD_FULL_KEY: AtomicU64 = AtomicU64::new(0);
+static PAD_HANDHELD: AtomicU64 = AtomicU64::new(0);
+static PAD_JOY_DUAL: AtomicU64 = AtomicU64::new(0);
+static PAD_GC: AtomicU64 = AtomicU64::new(0);
 
 /// State only the two screen hooks touch; both run on the game's main thread.
 struct GameState {
     repeater: Repeater,
+    blocked: Repeater,
+    pad: PadTracker,
+    pad_source: Option<(u32, u32)>,
     screen: Option<(Screen, u64)>,
     /// The cursor whose step is waiting to settle, settled frames seen, and
     /// the token slot the hand carried for that step (CSS).
@@ -107,6 +114,9 @@ struct Shared(UnsafeCell<GameState>);
 unsafe impl Sync for Shared {}
 static STATE: Shared = Shared(UnsafeCell::new(GameState {
     repeater: Repeater::new(),
+    blocked: Repeater::new(),
+    pad: PadTracker::new(),
+    pad_source: None,
     screen: None,
     settle_cursor: 0,
     settle_frames: 0,
@@ -318,12 +328,83 @@ fn p1_buttons() -> u64 {
     unsafe { poll(NPAD_NO1) | poll(NPAD_HANDHELD) }
 }
 
+fn resolve_pad_ring() {
+    for (name, slot) in [
+        (c"_ZN2nn3hid13GetNpadStatesEPNS0_16NpadFullKeyStateEiRKj", &PAD_FULL_KEY),
+        (c"_ZN2nn3hid13GetNpadStatesEPNS0_17NpadHandheldStateEiRKj", &PAD_HANDHELD),
+        (c"_ZN2nn3hid13GetNpadStatesEPNS0_16NpadJoyDualStateEiRKj", &PAD_JOY_DUAL),
+        (c"_ZN2nn3hid13GetNpadStatesEPNS0_11NpadGcStateEiRKj", &PAD_GC),
+    ] {
+        let mut address = 0;
+        if unsafe { nn::ro::LookupSymbol(&mut address, name.as_ptr().cast()) } == 0 {
+            slot.store(address as u64, Ordering::Relaxed);
+        }
+    }
+}
+
+fn p1_ring() -> Option<((u32, u32), [(i64, u64); PAD_RING])> {
+    unsafe fn style(id: u32) -> Option<u32> {
+        let flags = nn::hid::GetNpadStyleSet(&id).flags;
+        if flags & STYLE_GC != 0 {
+            Some(STYLE_GC)
+        } else if flags & STYLE_FULL_KEY != 0 {
+            Some(STYLE_FULL_KEY)
+        } else if flags & STYLE_HANDHELD != 0 {
+            Some(STYLE_HANDHELD)
+        } else if flags & STYLE_JOY_DUAL != 0 {
+            Some(STYLE_JOY_DUAL)
+        } else {
+            None
+        }
+    }
+    let (id, selected) = match unsafe { (style(NPAD_NO1), style(NPAD_HANDHELD)) } {
+        (Some(style), None) => (NPAD_NO1, style),
+        (None, Some(style)) => (NPAD_HANDHELD, style),
+        _ => return None,
+    };
+    let slot = match selected {
+        STYLE_FULL_KEY => &PAD_FULL_KEY,
+        STYLE_HANDHELD => &PAD_HANDHELD,
+        STYLE_JOY_DUAL => &PAD_JOY_DUAL,
+        STYLE_GC => &PAD_GC,
+        _ => return None,
+    };
+    let address = slot.load(Ordering::Relaxed) as usize;
+    if address == 0 {
+        return None;
+    }
+    let mut ring = [(0, 0); PAD_RING];
+    unsafe {
+        if selected == STYLE_GC {
+            let get: unsafe extern "C" fn(*mut nn::hid::NpadGcState, i32, *const u32) =
+                core::mem::transmute(address);
+            let mut states = [nn::hid::NpadGcState::default(); PAD_RING];
+            get(states.as_mut_ptr(), PAD_RING as i32, &id);
+            for (out, sample) in ring.iter_mut().zip(states) {
+                *out = (sample.updateCount, sample.Buttons);
+            }
+        } else {
+            let get: unsafe extern "C" fn(*mut nn::hid::NpadHandheldState, i32, *const u32) =
+                core::mem::transmute(address);
+            let mut states = [nn::hid::NpadHandheldState::default(); PAD_RING];
+            get(states.as_mut_ptr(), PAD_RING as i32, &id);
+            for (out, sample) in ring.iter_mut().zip(states) {
+                *out = (sample.updateCount, sample.Buttons);
+            }
+        }
+    }
+    Some(((id, selected), ring))
+}
+
 unsafe fn on_screen(screen: Screen, object: u64, view: &View) {
     let state = &mut *STATE.0.get();
     let now = tick();
     if state.screen != Some((screen, object)) {
         state.screen = Some((screen, object));
         state.repeater = Repeater::new();
+        state.blocked = Repeater::new();
+        state.pad.reset();
+        state.pad_source = None;
         state.settle_cursor = 0;
         push_event(
             EV_SCREEN,
@@ -335,14 +416,40 @@ unsafe fn on_screen(screen: Screen, object: u64, view: &View) {
         );
     }
     // The D-pad filter follows the same gate as the steps.
-    let buttons = if view.steppable {
+    if view.steppable {
         LIVE_CURSOR.store(view.cursor, Ordering::Relaxed);
         LIVE_UNTIL.store(now + LIVE_TICKS, Ordering::Relaxed);
-        p1_buttons()
     } else {
         LIVE_UNTIL.store(0, Ordering::Relaxed);
-        0
+    }
+    let mut batch = [(0, 0); PAD_RING];
+    let count = if let Some((source, ring)) = p1_ring() {
+        if state.pad_source != Some(source) {
+            state.pad.reset();
+            state.pad_source = Some(source);
+        }
+        state.pad.unseen(&ring, &mut batch)
+    } else {
+        state.pad.reset();
+        state.pad_source = None;
+        batch[0] = (0, p1_buttons());
+        1
     };
+    let mut buttons = [0; PAD_RING];
+    for (out, &(_, value)) in buttons.iter_mut().zip(&batch[..count]) {
+        *out = value;
+    }
+    let (dir, used) = if view.steppable {
+        state.blocked = Repeater::new();
+        state.repeater.feed(&buttons[..count])
+    } else {
+        state.repeater = Repeater::new();
+        state.blocked.feed(&buttons[..count])
+    };
+    state.pad.consume(&batch[..count], used);
+    if state.pad_source.is_none() {
+        state.pad.reset();
+    }
     let current = read_point(view.cursor + cursor::CURRENT as u64);
     let target = read_point(view.cursor + cursor::TARGET as u64);
     if state.settle_cursor == view.cursor {
@@ -366,9 +473,13 @@ unsafe fn on_screen(screen: Screen, object: u64, view: &View) {
             );
         }
     }
-    let Some(dir) = state.repeater.update(buttons) else {
+    let Some(dir) = dir else {
         return;
     };
+    if !view.steppable {
+        push_event(EV_BLOCKED, pack_blocked(screen, dir));
+        return;
+    }
     let bounds_at = view.cursor + cursor::BOUNDS as u64;
     let bounds = Rect {
         xmin: read_f32(bounds_at),
@@ -650,12 +761,15 @@ fn version_is_supported() -> bool {
 
 /// Appends the install line to `events.log` (trimmed when over 1 MiB) and
 /// the Skyline log.
-fn report_install(report: &mut Line<256>) {
+fn report_install(report: &mut Line<256>, pad_ring: bool) {
     let _ = write!(
         report,
         " heap_allocations={}",
         HEAP_ALLOCATIONS.load(Ordering::Relaxed)
     );
+    if pad_ring {
+        let _ = write!(report, " pad_ring={}", u8::from(PAD_FULL_KEY.load(Ordering::Relaxed) != 0));
+    }
     skyline::logging::log(core::str::from_utf8(report.as_bytes()).unwrap_or(""));
     let _ = report.write_char('\n');
     for directory in ["sd:/ultimate", DATA_DIR] {
@@ -682,7 +796,7 @@ pub fn main() {
     );
     if !version_is_supported() {
         let _ = write!(report, " result=unsupported_version");
-        report_install(&mut report);
+        report_install(&mut report, true);
         return;
     }
     // Every site is either hooked or a layout the hooks rely on: all or none.
@@ -691,9 +805,10 @@ pub fn main() {
         .find(|site| !unsafe { guard_matches(site) })
     {
         let _ = write!(report, " result=guard_mismatch site={}", site.name);
-        report_install(&mut report);
+        report_install(&mut report, true);
         return;
     }
+    resolve_pad_ring();
     observed::initialize();
     let writer = start_writer();
     let observe = if writer && observed::wait_for_registration() {
@@ -714,11 +829,11 @@ pub fn main() {
     if observe {
         let _ = write!(report, " observed=1");
     }
-    report_install(&mut report);
+    report_install(&mut report, true);
     observed::installation_reported();
     if !writer {
         report.clear();
         let _ = write!(report, "{} writer=not_started", tick());
-        report_install(&mut report);
+        report_install(&mut report, false);
     }
 }

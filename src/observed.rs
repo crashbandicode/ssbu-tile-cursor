@@ -256,6 +256,7 @@ pub(super) unsafe fn observe(screen: Screen, object: u64, view: Option<View>) {
         let code = slot.code.load(Ordering::Relaxed) as u8;
         match code {
             EV_STEP => sample.step.emitted(slot.a.load(Ordering::Relaxed)),
+            EV_BLOCKED => sample.step.blocked += 1,
             EV_SETTLED => {
                 let record = slot.a.load(Ordering::Relaxed);
                 // Require the original settle_token's native hover AND today's
