@@ -2,8 +2,9 @@
 
 ## CPU coin work
 
-This branch starts at `236c98d`. `docs/design/cpu-coin.md` traces the
-requirements; the red tests include the scm1 Random coin and empty-hand
+This branch starts at `236c98d`. `docs/design/cpu-coin.md` describes the design;
+the requirement trace is in `tile-cursor-state/gate-b110fda/DESIGN-TRACE.md`.
+The red tests include the scm1 Random coin and empty-hand
 banner fixtures, and three old-reader goldens from the base. The observed
 Training owner publishes the 13 appended coin fields and permits an empty
 hand to target the game's offered coins; standalone movement stays unchanged.
@@ -117,5 +118,5 @@ cargo clippy --all-targets -- -D warnings
 cargo build --no-default-features
 cargo skyline build --release
 cargo skyline build --release --features diag
-python3 -I ~/ssbu-mod-playbook/tools/check/compliance.py . --nro <release NRO> --base 236c98d --trace docs/design/cpu-coin.md
+python3 -I ~/ssbu-mod-playbook/tools/check/compliance.py . --nro <release NRO> --base 236c98d --trace <gate>/DESIGN-TRACE.md
 ```

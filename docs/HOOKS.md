@@ -140,7 +140,8 @@ them directly.
 - **Token ("medal") manager.** At `[css+0xdf0]` on the CSS and `[sss+0x70]` on
   stage select: capacity 10 entries of 0x130 bytes, count at `+0xbe0`, and
   the token area rectangle at `+0xbec`. The scm1 Training CSS count was 8;
-  only slots below the two player entries are offered. Candidate flags,
+  the plugin offers only slots below the two player entries, and slots 2 to 7
+  were not captured. Candidate flags,
   resting vectors and the pane position are checked exactly. A token being
   carried follows the game's own logic. The plugin does not touch it.
 

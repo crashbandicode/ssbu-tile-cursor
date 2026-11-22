@@ -6,24 +6,14 @@ Base: `236c98d2ee1f1a1d7e313436ab7d9f15c718491d`. The wire contract is
 
 ## Requirement trace
 
-The 13:54:31Z and the 14:06:33Z approval entries below are the primary's
-records in `artifacts/phase23/HANDOFF-PRIMARY-tr-primary-2.md`, not verbatim
-operator quotations. The 14:06:33Z setup-time sentence is recorded there as
-the operator's own words.
-
-| Operator clause | Design | Test |
-| --- | --- | --- |
-| Primary record, 13:54:31Z: “CPU for strip fixtures: use the tile selector to pick the CPU at character select; also extend it to recognise TR character menus (cycles etc.) and select there; the bridge already reports the current CPU.” | The observed owner publishes P1 and CPU coin state and the carried fighter independently, including the game's chosen pickup token. TrainingRooms menu support is a separate lane. | `an_empty_hand_reports_the_token_it_points_at`, `the_cpu_medal_reports_its_tile_and_fighter`, `a_carried_cpu_coin_reports_its_hover_and_leaves_p1_placed` |
-| Primary record, 13:54:31Z: “CPU for strip fixtures: use the tile selector to pick the CPU at character select; also extend it to recognise TR character menus (cycles etc.) and select there; the bridge already reports the current CPU.” | The observed owner steps an empty hand to the next or previous game-offered coin with L3 + Left/Right, writes the native cursor target, and reports which coin the game points at after settling. | `coins_are_offered_by_the_games_own_test`, `a_token_step_targets_the_coin_from_the_banner`, `an_empty_hand_token_step_targets_the_cpu_coin` |
-| Primary record, 14:06:33Z: “7k tile macro hold 2->6 approved (fusion-g4 told).” | Keep one outcome per update and frame-based repeat for carried and empty hands; extra presses block instead of being deferred. | `a_six_frame_hold_steps_once`, `an_empty_hand_token_step_targets_the_cpu_coin` |
-| Operator, 14:06:33Z: “I do not want most work being spent setting up tests so we need to improve things there” | Append self-verifying token, coin and carried-fighter fields to the existing block; keep the existing 43 lines byte-identical except for the requested step outcome semantics. | `an_empty_hand_reports_the_token_it_points_at`, `a_token_step_shows_in_the_old_lines_only_as_a_step`, `an_edge_token_step_is_an_edge`, `old_lines_are_unchanged_for_p1s_coin`, `old_lines_are_unchanged_for_an_empty_hand`, `old_lines_are_unchanged_for_a_carried_cpu_coin` |
-| Operator, 14:06:33Z: “I do not want most work being spent setting up tests so we need to improve things there” | Bound publication to the bridge payload; guard every additional native layout read, validate pointers, and keep standalone hooks unchanged. | `the_longest_block_fits_its_buffer`, guard-head test, three old-reader pins, standalone hook diff |
+The requirement-trace table is kept beside the lane handoff in `artifacts/phase23/tile-cursor-state/gate-b110fda/DESIGN-TRACE.md` and copied into the current gate.
 
 ## State and inputs
 
 On Training's two-player fighter select only, an active, enabled, shown P1
-hand carrying no coin can select a candidate in slot order. Slots are bounded
-by the two player entries, not the measured medal-array count of eight.
+hand carrying no coin can select a candidate in slot order. The plugin bounds
+slots by the two player entries, not the measured medal-array count of eight;
+slots 2 to 7 were not captured.
 Candidates use the game's flags, exact rest and pane equality, and the hand
 area; no tolerance or stale-state smoothing is added. Up/Down and extra
 presses remain blocked, and a missing neighbor is an edge.
