@@ -814,6 +814,163 @@ mod tests {
 
     const PRESS: u64 = BUTTON_L3 | BUTTON_RIGHT;
 
+    fn play(r: &mut Repeater, frames: &[&[u64]]) -> Vec<Option<Dir>> {
+        frames.iter().map(|f| r.feed(f).0).collect()
+    }
+
+    #[test]
+    fn a_chord_that_comes_and_goes_between_two_updates_still_steps() {
+        let frames: &[&[u64]] = &[
+            &[BUTTON_L3],
+            &[BUTTON_L3 | BUTTON_UP, BUTTON_L3 | BUTTON_UP, 0],
+            &[0],
+        ];
+        let mut r = Repeater::new();
+        let steps = play(&mut r, frames);
+        assert_eq!(
+            steps.iter().filter(|&&step| step == Some(Dir::Up)).count(),
+            1
+        );
+
+        let mut tracker = PadTracker::new();
+        let mut r = Repeater::new();
+        let mut out = [(0, 0); PAD_RING];
+        let rings: &[&[(i64, u64)]] = &[
+            &[(100, BUTTON_L3), (99, 0)],
+            &[
+                (106, 0),
+                (105, BUTTON_L3 | BUTTON_UP),
+                (104, BUTTON_L3 | BUTTON_UP),
+                (103, BUTTON_L3 | BUTTON_UP),
+                (102, BUTTON_L3),
+                (101, BUTTON_L3),
+                (100, BUTTON_L3),
+            ],
+            &[
+                (109, 0),
+                (108, 0),
+                (107, 0),
+                (106, 0),
+                (105, BUTTON_L3 | BUTTON_UP),
+                (104, BUTTON_L3 | BUTTON_UP),
+                (103, BUTTON_L3 | BUTTON_UP),
+            ],
+        ];
+        let mut steps = Vec::new();
+        for (ring, expected_last) in rings.iter().zip([100, 103, 109]) {
+            let count = tracker.unseen(ring, &mut out);
+            let buttons: Vec<_> = out[..count].iter().map(|(_, buttons)| *buttons).collect();
+            let (step, used) = r.feed(&buttons);
+            tracker.consume(&out[..count], used);
+            assert_eq!(tracker.last, Some(expected_last));
+            steps.push(step);
+        }
+        assert_eq!(steps, [None, Some(Dir::Up), None]);
+    }
+
+    #[test]
+    fn two_taps_in_one_batch_are_preserved_for_successive_frames() {
+        let chord = BUTTON_L3 | BUTTON_UP;
+        let mut r = Repeater::new();
+        assert_eq!(r.feed(&[chord, 0, chord, 0]), (Some(Dir::Up), 1));
+        assert_eq!(r.feed(&[0, chord, 0]), (Some(Dir::Up), 2));
+        assert_eq!(r.feed(&[0]), (None, 1));
+        assert_eq!(r.feed(&[]), (None, 0));
+    }
+
+    #[test]
+    fn multiple_samples_count_as_one_repeat_frame() {
+        let chord = BUTTON_L3 | BUTTON_RIGHT;
+        let mut r = Repeater::new();
+        assert_eq!(r.feed(&[chord]), (Some(Dir::Right), 1));
+        for _ in 1..REPEAT_FRAMES {
+            assert_eq!(r.feed(&[chord, chord, chord]), (None, 3));
+        }
+        assert_eq!(r.feed(&[chord, chord, chord]), (Some(Dir::Right), 3));
+
+        let mut old = Repeater::new();
+        let mut batched = Repeater::new();
+        let sequence = [0, BUTTON_L3, chord, chord, 0, BUTTON_UP, BUTTON_L3 | BUTTON_UP,
+                        BUTTON_L3 | BUTTON_UP | BUTTON_RIGHT, chord];
+        for buttons in sequence.into_iter().cycle().take(200) {
+            assert_eq!(old.update(buttons), batched.feed(&[buttons]).0);
+        }
+    }
+
+    #[test]
+    fn batch_handles_release_direction_diagonal_and_l3_order() {
+        let mut r = Repeater::new();
+        assert_eq!(r.feed(&[BUTTON_L3 | BUTTON_UP]), (Some(Dir::Up), 1));
+        assert_eq!(r.feed(&[0, BUTTON_L3 | BUTTON_RIGHT]), (Some(Dir::Right), 2));
+        assert_eq!(r.feed(&[BUTTON_L3 | BUTTON_UP | BUTTON_RIGHT]), (None, 1));
+        assert_eq!(r.feed(&[BUTTON_UP]), (None, 1));
+        assert_eq!(r.feed(&[BUTTON_UP, BUTTON_L3 | BUTTON_UP]), (Some(Dir::Up), 2));
+    }
+
+    #[test]
+    fn empty_batch_advances_held_repeats_once() {
+        let mut r = Repeater::new();
+        assert_eq!(r.feed(&[]), (None, 0));
+        assert_eq!(r.feed(&[BUTTON_L3 | BUTTON_UP]), (Some(Dir::Up), 1));
+        for _ in 1..REPEAT_FRAMES {
+            assert_eq!(r.feed(&[]), (None, 0));
+        }
+        assert_eq!(r.feed(&[]), (Some(Dir::Up), 0));
+        assert_eq!(r.feed(&[0]), (None, 1));
+        assert_eq!(r.feed(&[]), (None, 0));
+    }
+
+    #[test]
+    fn tracker_primes_orders_consumes_and_stops_at_invalid_tail() {
+        let mut t = PadTracker::new();
+        let mut out = [(0, 0); PAD_RING];
+        assert_eq!(t.unseen(&[], &mut out), 0);
+        let initial = [(10, 10), (9, 9), (0, 0), (0, 0)];
+        assert_eq!(t.unseen(&initial, &mut out), 1);
+        assert_eq!(out[0], (10, 10));
+        t.consume(&out[..1], 1);
+        assert_eq!(t.last, Some(10));
+
+        let ring = [(14, 14), (13, 13), (12, 12), (11, 11), (0, 0), (0, 0)];
+        let n = t.unseen(&ring, &mut out);
+        assert_eq!(n, 4);
+        assert_eq!(&out[..n], &[(11, 11), (12, 12), (13, 13), (14, 14)]);
+        t.consume(&out[..n], 2);
+        assert_eq!(t.last, Some(12));
+        let n = t.unseen(&ring, &mut out);
+        assert_eq!(&out[..n], &[(13, 13), (14, 14)]);
+        t.consume(&out[..n], 0);
+        assert_eq!(t.last, Some(12));
+        let n = t.unseen(&[(16, 16), (15, 15), (15, 99), (14, 14)], &mut out);
+        assert_eq!(&out[..n], &[(15, 15), (16, 16)]);
+
+        let sixteen: Vec<_> = (13..=28).rev().map(|i| (i, i as u64)).collect();
+        let n = t.unseen(&sixteen, &mut out);
+        assert_eq!(n, PAD_RING);
+        assert_eq!(out[0], (13, 13));
+        assert_eq!(out[15], (28, 28));
+        t.reset();
+        assert_eq!(t.last, None);
+        assert_eq!(t.unseen(&sixteen, &mut out), 1);
+        assert_eq!(out[0], (28, 28));
+    }
+
+    #[test]
+    fn blocked_event_round_trips_screen_and_direction() {
+        for (screen, name, dir, direction) in [
+            (Screen::Css, "css", Dir::Up, "up"),
+            (Screen::Sss, "sss", Dir::Left, "left"),
+        ] {
+            let (a, b) = pack_blocked(screen, dir);
+            assert_eq!(Screen::from_code(a & 0xff), screen);
+            assert_eq!(Dir::from_code((a >> 8) as u8), Some(dir));
+            let mut line = Line::<128>::new();
+            describe(&RawEvent { tick: 7, code: EV_BLOCKED, a, b }, &mut line).unwrap();
+            assert_eq!(core::str::from_utf8(line.as_bytes()).unwrap(),
+                       format!("7 blocked screen={name} dir={direction}"));
+        }
+    }
+
     #[test]
     fn steps_fire_on_press_then_repeat() {
         let mut r = Repeater::new();

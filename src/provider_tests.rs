@@ -987,6 +987,7 @@ fn css_mid_move_has_a_reliable_phase() {
         fighter: None,
         step: Step {
             ack: 11,
+            blocked: 0,
             applied: 11,
             dir: Some(Dir::Up),
             from: Some(78),
@@ -1019,6 +1020,7 @@ fn css_reliability_sample(ack: u64) -> Sample {
         target: Some(67),
         step: Step {
             ack,
+            blocked: 0,
             applied: ack,
             dir: Some(Dir::Up),
             from: Some(78),
@@ -1214,7 +1216,7 @@ fn appended_state_keys_preserve_legacy_order() {
         "p1.placed.at", "p1.placed.kind", "p1.placed.name", "p1.placed.form", "local.token",
         "placed.at", "placed.kind", "placed.name", "placed.form", "settled", "applied",
         "direction", "from", "to", "result", "settled.ack", "phase", "target.at",
-        "target.kind", "target.name",
+        "target.kind", "target.name", "blocked",
     ]);
 }
 
@@ -1230,7 +1232,7 @@ fn all_css_stock_targets_fit_worst_case_legacy_content() {
                 fighter: Some(Fighter(longest)), p1_token: token, p1_carried: carried,
                 p1_placed: Some((longest, Fighter(longest))),
                 step: Step {
-                    ack: u64::MAX, applied: u64::MAX, last_written: u64::MAX,
+                    ack: u64::MAX, blocked: u64::MAX, applied: u64::MAX, last_written: u64::MAX,
                     dir: Some(Dir::Right), from: Some(u16::MAX), to: Some(longest),
                     token: carried, settled_ack: Some(u64::MAX),
                 },
@@ -1241,4 +1243,19 @@ fn all_css_stock_targets_fit_worst_case_legacy_content() {
             assert!(actual.len() < 1024, "target {target} and {token:?}: {}", actual.len());
         }
     }
+}
+
+#[test]
+fn blocked_counter_is_appended_and_survives_owner_changes() {
+    let original = css_reliability_sample(11);
+    let mut changed = original;
+    changed.step.blocked = 2;
+    let a = block(&mut Publisher::default(), 1, Some(original), true);
+    let b = block(&mut Publisher::default(), 1, Some(changed), true);
+    assert_eq!(a.lines().take(42).collect::<Vec<_>>(), b.lines().take(42).collect::<Vec<_>>());
+    assert_eq!(b.lines().count(), 43);
+    assert_eq!(b.lines().nth(42), Some("blocked=2"));
+    changed.step.new_owner();
+    assert_eq!(changed.step.blocked, 2);
+    assert_eq!(changed.step.ack, original.step.ack);
 }
