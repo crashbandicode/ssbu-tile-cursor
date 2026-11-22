@@ -1012,6 +1012,152 @@ mod tests {
         })
     }
 
+    fn assert_held_repeat_across(disruption: u8) {
+        let mut input = PadInput::new();
+        let mut owner = PAD_OWNER;
+        let mut source = PAD_SOURCE;
+        let chord = BUTTON_L3 | BUTTON_UP;
+        for frame in 0..=REPEAT_FRAMES {
+            if frame == 5 {
+                match disruption {
+                    0 => input.gap(),
+                    1 => owner.2 += 1,
+                    2 => {}
+                    3 => source.0 += 1,
+                    _ => unreachable!(),
+                }
+            }
+            let outcome = if disruption == 2 && frame == 5 {
+                input.frame(owner, true, None, || chord)
+            } else {
+                pad_frame(&mut input, owner, true, source, &[(100 + i64::from(frame), chord)])
+            };
+            let expected = if frame == 0 || frame == REPEAT_FRAMES {
+                PadOutcome::Step(Dir::Up)
+            } else {
+                PadOutcome::None
+            };
+            assert_eq!(outcome, expected, "callback {}", frame + 1);
+        }
+    }
+
+    #[test]
+    fn fix3b_h1_hold_survives_no_view_gap() {
+        assert_held_repeat_across(0);
+    }
+
+    #[test]
+    fn fix3b_h2_hold_survives_cursor_replacement() {
+        assert_held_repeat_across(1);
+    }
+
+    #[test]
+    fn fix3b_h3_hold_survives_single_sample_fallback() {
+        assert_held_repeat_across(2);
+    }
+
+    #[test]
+    fn fix3b_h3_hold_survives_source_change() {
+        assert_held_repeat_across(3);
+    }
+
+    #[test]
+    fn fix3b_h4_screen_and_object_changes_reset_held_steps() {
+        let chord = BUTTON_L3 | BUTTON_UP;
+        let mut input = PadInput::new();
+        assert_eq!(pad_frame(&mut input, PAD_OWNER, true, PAD_SOURCE, &[(100, chord)]),
+                   PadOutcome::Step(Dir::Up));
+        input.reset();
+        assert_eq!(pad_frame(&mut input, PAD_OWNER, true, PAD_SOURCE, &[(101, chord)]),
+                   PadOutcome::Step(Dir::Up));
+        let other_object = (PAD_OWNER.0, PAD_OWNER.1 + 1, PAD_OWNER.2);
+        assert_eq!(pad_frame(&mut input, other_object, true, PAD_SOURCE, &[(102, chord)]),
+                   PadOutcome::Step(Dir::Up));
+        let other_screen = (Screen::Sss, other_object.1, other_object.2);
+        assert_eq!(pad_frame(&mut input, other_screen, true, PAD_SOURCE, &[(103, chord)]),
+                   PadOutcome::Step(Dir::Up));
+    }
+
+    fn compare_single_samples_with_pre_ring_rule(owner_changes: bool) {
+        fn draw(seed: &mut u64) -> u32 {
+            *seed = seed.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+            (*seed >> 32) as u32
+        }
+        let choices = [
+            0, BUTTON_L3, BUTTON_L3 | BUTTON_UP, BUTTON_L3 | BUTTON_DOWN,
+            BUTTON_L3 | BUTTON_LEFT, BUTTON_L3 | BUTTON_RIGHT, BUTTON_UP,
+            BUTTON_L3 | BUTTON_UP | BUTTON_LEFT,
+        ];
+        let mut input = PadInput::new();
+        let mut reference = Repeater::new();
+        let mut seed = 0x1f4d_2a83_6b70_c951;
+        let mut owner = PAD_OWNER;
+        let mut source = PAD_SOURCE;
+        let mut ring = Vec::new();
+        let mut coverage = [0usize; 7];
+        for callback in 0..6000 {
+            let buttons = choices[draw(&mut seed) as usize % choices.len()];
+            ring.insert(0, (i64::from(callback) + 100, buttons));
+            ring.truncate(PAD_RING);
+            if draw(&mut seed) % 13 == 0 {
+                coverage[0] += 1;
+                input.gap();
+                continue;
+            }
+            if draw(&mut seed) % 9 == 0 {
+                coverage[1] += 1;
+                owner.2 ^= 1;
+            }
+            if owner_changes && draw(&mut seed) % 43 == 0 {
+                if draw(&mut seed) % 2 == 0 {
+                    owner.0 = if owner.0 == Screen::Css { Screen::Sss } else { Screen::Css };
+                    coverage[5] += 1;
+                } else {
+                    owner.1 ^= 1;
+                    coverage[6] += 1;
+                }
+                reference = Repeater::new();
+            }
+            if draw(&mut seed) % 11 == 0 {
+                coverage[2] += 1;
+                source.0 ^= 1;
+            }
+            let steppable = draw(&mut seed) % 4 != 0;
+            if !steppable {
+                coverage[3] += 1;
+            }
+            let ring_available = draw(&mut seed) % 4 != 0;
+            if !ring_available {
+                coverage[4] += 1;
+            }
+            let expected = reference.update(if steppable { buttons } else { 0 });
+            let outcome = if ring_available {
+                input.frame(owner, steppable, Some((source, &ring)), || panic!("unexpected fallback"))
+            } else {
+                input.frame(owner, steppable, None, || buttons)
+            };
+            let actual = match outcome {
+                PadOutcome::Step(dir) => Some(dir),
+                PadOutcome::None | PadOutcome::Blocked { .. } => None,
+            };
+            assert_eq!(actual, expected, "callback {callback}, buttons {buttons:#x}, steppable {steppable}, ring {ring_available}");
+        }
+        assert!(coverage[..5].iter().all(|&n| n > 0), "{coverage:?}");
+        if owner_changes {
+            assert!(coverage[5..].iter().all(|&n| n > 0), "{coverage:?}");
+        }
+    }
+
+    #[test]
+    fn fix3b_d1_matches_pre_ring_rule_for_one_sample_per_callback() {
+        compare_single_samples_with_pre_ring_rule(false);
+    }
+
+    #[test]
+    fn fix3b_d1_matches_pre_ring_rule_with_screen_and_object_changes() {
+        compare_single_samples_with_pre_ring_rule(true);
+    }
+
     #[test]
     fn blocked_taps_are_counted_and_never_replayed_as_steps() {
         let mut input = PadInput::new();
