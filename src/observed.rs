@@ -221,7 +221,13 @@ pub(super) unsafe fn observe(screen: Screen, object: u64, view: Option<View>) {
     // It is also the sole producer during this synchronous owner invocation.
     // Its STEP record is emitted after the native target write (or a blocked edge).
     let first = EVENT_HEAD.load(Ordering::Relaxed);
-    on_screen(screen, object, &view);
+    let layout = grid(screen, &view);
+    let coins = if screen == Screen::Css && layout == Some(crate::layout::Layout::Css) {
+        p1::coins(object, &view)
+    } else {
+        None
+    };
+    on_screen(screen, object, &view, coins.as_ref());
     let last = EVENT_HEAD.load(Ordering::Relaxed);
     let sample = &mut owner.latest;
     let current = read_point(view.cursor + cursor::CURRENT as u64);
@@ -258,6 +264,7 @@ pub(super) unsafe fn observe(screen: Screen, object: u64, view: Option<View>) {
         let code = slot.code.load(Ordering::Relaxed) as u8;
         match code {
             EV_STEP => sample.step.emitted(slot.a.load(Ordering::Relaxed)),
+            EV_TOKEN => sample.step.token_emitted(slot.a.load(Ordering::Relaxed)),
             EV_BLOCKED => {
                 let presses = model::unpack_blocked(slot.a.load(Ordering::Relaxed))
                     .into_iter()
@@ -285,9 +292,9 @@ pub(super) unsafe fn observe(screen: Screen, object: u64, view: Option<View>) {
             _ => {}
         }
     }
-    sample.grid = grid(screen, &view);
+    sample.grid = layout;
     if screen == Screen::Css {
-        p1::collect(object, &view, sample);
+        p1::collect(object, &view, coins.as_ref(), sample);
         sample.hand_steppable = view.steppable;
         sample.css_entry = view.steppable
             && crate::layout::supported_css_entry(sample.grid, current, sample.at, raw_hover);

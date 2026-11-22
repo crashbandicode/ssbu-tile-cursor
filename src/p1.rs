@@ -1,9 +1,9 @@
 //! Verified data paths from the 13.0.5 CSS player update and medal commit.
 //! Called only from the registered CSS owner; native seat zero is not local ownership.
 use super::*;
-use crate::provider::{fighter_identity, local_seat, MedalFacts, P1Token, Sample, SeatInput};
+use crate::provider::{fighter_identity, local_seat, HandToken, MedalFacts, P1Token, Sample, SeatInput};
 
-unsafe fn slot_zero(vector: u64, id_offset: usize) -> Option<u64> {
+unsafe fn slot(vector: u64, id_offset: usize, id: i32) -> Option<u64> {
     let begin = read_u64(vector);
     let end = read_u64(vector + 8);
     let bytes = end.checked_sub(begin)?;
@@ -13,7 +13,7 @@ unsafe fn slot_zero(vector: u64, id_offset: usize) -> Option<u64> {
     let mut first = None;
     for entry in (begin..end).step_by(16) {
         let obj = read_u64(entry + 8);
-        if valid(obj) && read_i32(obj + id_offset as u64) == 0 {
+        if valid(obj) && read_i32(obj + id_offset as u64) == id {
             if first.is_some() {
                 return None;
             }
@@ -21,6 +21,10 @@ unsafe fn slot_zero(vector: u64, id_offset: usize) -> Option<u64> {
         }
     }
     first
+}
+
+unsafe fn slot_zero(vector: u64, id_offset: usize) -> Option<u64> {
+    slot(vector, id_offset, 0)
 }
 
 unsafe fn read_local_seat(css: u64) -> Option<u8> {
@@ -69,8 +73,109 @@ unsafe fn rect_at(addr: u64) -> Rect {
     }
 }
 
-pub(super) unsafe fn collect(css: u64, view: &View, sample: &mut Sample) {
+pub(super) unsafe fn coins(css: u64, view: &View) -> Option<Coins> {
+    let vector = css + model::css::PLAYERS as u64;
+    let begin = read_u64(vector);
+    if !valid(begin) || read_u64(vector + 8).checked_sub(begin) != Some(32)
+        || read_local_seat(css) != Some(0)
+    {
+        return None;
+    }
+    let player = slot_zero(vector, model::css::PLAYER_INDEX)?;
+    let hand_addr = read_u64(player + model::css::PLAYER_HAND as u64);
+    if !valid(hand_addr)
+        || read_u64(hand_addr + hand::CURSOR as u64) != view.cursor
+        || read_u8(player + model::css::PLAYER_ACTIVE as u64) == 0
+        || read_u8(hand_addr + hand::ENABLED as u64) == 0
+        || read_u8(hand_addr + hand::SHOWN as u64) == 0
+        || read_i32(player + model::css::PLAYER_CARRIED as u64) != -1
+        || read_u8(hand_addr + hand::HOLDING as u64) != 0
+    {
+        return None;
+    }
+    let medals = read_u64(css + model::css::MEDALS as u64);
+    if !valid(medals) {
+        return None;
+    }
+    let count = read_i32(medals + model::css::MEDAL_COUNT as u64);
+    if !(2..=model::css::SLOTS as i32).contains(&count) {
+        return None;
+    }
+    let pointed = read_i32(player + model::css::PLAYER_HOVER_TOKEN as u64);
+    if !(-1..2).contains(&pointed) {
+        return None;
+    }
+    let area = rect_at(hand_addr + hand::AREA as u64);
+    let current = read_point(view.cursor + cursor::CURRENT as u64);
+    if !area.contains(current.0, current.1) {
+        return None;
+    }
+    let mut result = Coins {
+        pointed: usize::try_from(pointed).ok(),
+        at: [None; model::css::SLOTS],
+    };
+    for slot in 0..2 {
+        let medal = medals + (slot * model::css::MEDAL_STRIDE) as u64;
+        let root = read_u64(medal + 0x28);
+        let pane = if valid(root) {
+            let vector = read_u64(root + 0x18);
+            if valid(vector) {
+                let pane = read_u64(vector);
+                valid(pane).then(|| read_point(pane + 0x30))
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+        let facts = model::CoinFacts {
+            flags: core::array::from_fn(|i| read_u8(medal + 0x118 + i as u64)),
+            rest: [read_point(medal + 0xe0), read_point(medal + 0xf0)],
+            pane,
+        };
+        result.at[slot] = model::coin_offer(slot, &facts, area);
+    }
+    Some(result)
+}
+
+unsafe fn panel_fighter(panel: u64, view: &View, index: u16, stable: bool) -> Option<crate::provider::Fighter> {
+    if usize::from(index) >= view.tiles.count {
+        return None;
+    }
+    let base = view.tiles.begin + u64::from(index) * view.tiles.stride;
+    fighter_identity(
+        index,
+        read_u64(panel + 0x200),
+        [read_u64(base), read_u64(base + 8)],
+        [read_u8(panel + 0x6be), read_u8(panel + 0x6bf)],
+        stable,
+    )
+}
+
+unsafe fn medal_facts(player: u64, hand_addr: u64, medal: u64, panel: u64, view: &View) -> MedalFacts {
+    let index = u16::try_from(read_i32(medal + 0x1c))
+        .ok()
+        .filter(|&n| usize::from(n) < view.tiles.count);
+    MedalFacts {
+        carried: read_i32(player + model::css::PLAYER_CARRIED as u64),
+        holding: read_u8(hand_addr + hand::HOLDING as u64),
+        visible: read_u8(medal + 0x11b),
+        grabbed: read_u8(medal + 0x11f),
+        panel_flags: [read_u8(panel + 0x6ba), read_u8(panel + 0x6bd)],
+        placed: index,
+        rect_matches: index.is_some_and(|i| {
+            let rect = view.tiles.rect(usize::from(i));
+            rect.xmin < rect.xmax && rect.ymin < rect.ymax && rect == rect_at(medal + 0xd0)
+        }),
+        placed_fighter: index.and_then(|i| panel_fighter(panel, view, i, true)),
+    }
+}
+
+pub(super) unsafe fn collect(css: u64, view: &View, coins: Option<&Coins>, sample: &mut Sample) {
     sample.local_seat = read_local_seat(css);
+    sample.hand_token = coins.map_or(HandToken::Unknown, |coins| {
+        coins.pointed.map_or(HandToken::None, |slot| HandToken::Slot(slot as u8))
+    });
     let Some(player) = slot_zero(css + model::css::PLAYERS as u64, model::css::PLAYER_INDEX) else {
         return;
     };
@@ -84,52 +189,51 @@ pub(super) unsafe fn collect(css: u64, view: &View, sample: &mut Sample) {
     let Some(panel) = slot_zero(css + 0x250, 0x150) else {
         return;
     };
-    let medal = read_u64(css + 0xdf0);
+    let medal = read_u64(css + model::css::MEDALS as u64);
     if !valid(medal) {
         return;
     }
 
-    let panel_kind = read_u64(panel + 0x200);
-    let variant = [read_u8(panel + 0x6be), read_u8(panel + 0x6bf)];
-    let tile_kind = |index: u16, stable: bool| {
-        let i = usize::from(index);
-        if i >= view.tiles.count {
-            return None;
-        }
-        // The lookup at 0x19f1fa0 reads the default word at +0 and, for a set
-        // variant flag, the alternate at +8 of this same 0xb0-stride vector.
-        let base = view.tiles.begin + u64::from(index) * view.tiles.stride;
-        fighter_identity(index, panel_kind, [read_u64(base), read_u64(base + 8)], variant, stable)
-    };
-    let index = u16::try_from(read_i32(medal + 0x1c))
-        .ok()
-        .filter(|&n| usize::from(n) < view.tiles.count);
-    let facts = MedalFacts {
-        carried: read_i32(player + model::css::PLAYER_CARRIED as u64),
-        holding: read_u8(hand_addr + hand::HOLDING as u64),
-        visible: read_u8(medal + 0x11b),
-        grabbed: read_u8(medal + 0x11f),
-        panel_flags: [read_u8(panel + 0x6ba), read_u8(panel + 0x6bd)],
-        placed: index,
-        rect_matches: index.is_some_and(|i| {
-            let rect = view.tiles.rect(usize::from(i));
-            rect.xmin < rect.xmax && rect.ymin < rect.ymax && rect == rect_at(medal + 0xd0)
-        }),
-        placed_fighter: index.and_then(|i| tile_kind(i, true)),
-    };
+    let facts = medal_facts(player, hand_addr, medal, panel, view);
     sample.p1_token = facts.token();
+    sample.p1_coin = facts.coin(0);
+    if sample.p1_coin == P1Token::Placed {
+        sample.p1_coin_at = facts.placed;
+    }
     if sample.p1_token == P1Token::Held && view.steppable && view.token == Some(0) {
         sample.fighter = sample
             .hover
-            .and_then(|i| tile_kind(i, sample.resting && sample.at == Some(i)));
+            .and_then(|i| panel_fighter(panel, view, i, sample.resting && sample.at == Some(i)));
+        sample.carried_fighter = sample.fighter;
     }
     if sample.p1_token == P1Token::Placed {
-        sample.p1_placed = index.zip(facts.placed_fighter);
+        sample.p1_placed = facts.placed.zip(facts.placed_fighter);
+    }
+    if let Some(cpu_panel) = slot(css + 0x250, 0x150, 1) {
+        let count = read_i32(medal + model::css::MEDAL_COUNT as u64);
+        if (2..=model::css::SLOTS as i32).contains(&count) {
+            let cpu = medal_facts(player, hand_addr, medal + model::css::MEDAL_STRIDE as u64, cpu_panel, view);
+            sample.cpu_token = cpu.coin(1);
+            if sample.cpu_token == P1Token::Placed {
+                sample.cpu_placed = cpu.placed.zip(cpu.placed_fighter);
+            }
+            if sample.cpu_token == P1Token::Held && view.steppable && view.token == Some(1) {
+                sample.carried_fighter = sample.hover.and_then(|i| {
+                    panel_fighter(cpu_panel, view, i, sample.resting && sample.at == Some(i))
+                });
+            }
+        }
     }
 }
 
 // Exact stock instruction witnesses for optional reader field paths.
 pub(super) static GUARDS: &[Site] = &[
+    model::cpu_guards::CSS_MEDAL_COUNT,
+    model::cpu_guards::CSS_HOVER_HAND_AREA,
+    model::cpu_guards::CSS_HOVER_MEDAL_FLAGS,
+    model::cpu_guards::CSS_HOVER_MEDAL_POSITION,
+    model::cpu_guards::CSS_HOVER_TOKEN_WRITE,
+    model::cpu_guards::CSS_GRAB_HOVER_TOKEN,
     Site {
         name: "direct_input_cached_id",
         offset: 0x3764494,

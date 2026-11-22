@@ -101,6 +101,8 @@ pub struct Step {
     pub token: Option<u16>,
     pub last_written: u64,
     pub settled_ack: Option<u64>,
+    pub token_step: bool,
+    pub token_target: Option<u16>,
 }
 
 impl Step {
@@ -115,7 +117,28 @@ impl Step {
         self.to = index(32);
         self.token = index(48);
         self.settled_ack = None;
+        self.token_step = false;
+        self.token_target = None;
         if self.to.is_some() {
+            self.applied += 1;
+            self.last_written = self.ack;
+        }
+    }
+
+    pub fn token_emitted(&mut self, word: u64) {
+        let index = |shift: u32| {
+            let n = (word >> shift) as u16;
+            (n != u16::MAX).then_some(n)
+        };
+        self.ack += 1;
+        self.dir = Dir::from_code((word >> 8) as u8);
+        self.from = index(16);
+        self.to = index(32);
+        self.token = None;
+        self.settled_ack = None;
+        self.token_step = true;
+        self.token_target = index(48);
+        if self.token_target.is_some() {
             self.applied += 1;
             self.last_written = self.ack;
         }
@@ -243,6 +266,14 @@ pub enum P1Token {
     Held,
     Placed,
 }
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum HandToken {
+    #[default]
+    Unknown,
+    None,
+    Slot(u8),
+}
 impl P1Token {
     fn name(self) -> &'static str {
         match self {
@@ -280,6 +311,24 @@ impl MedalFacts {
             _ => P1Token::Unknown,
         }
     }
+
+    pub fn coin(&self, slot: i32) -> P1Token {
+        // CPU held and fighter placement are analogies; see measure/scm1/RESULT.md.
+        if self.carried == slot && self.holding == 1 && self.visible == 1 && self.grabbed == 1 {
+            P1Token::Held
+        } else if self.carried != slot
+            && self.grabbed == 0
+            && self.visible == 1
+            && self.panel_flags == [0, 1]
+            && self.placed.is_some()
+            && self.rect_matches
+            && self.placed_fighter.is_some()
+        {
+            P1Token::Placed
+        } else {
+            P1Token::Unknown
+        }
+    }
 }
 
 #[derive(Default, Debug, Clone, Copy, Eq, PartialEq)]
@@ -301,6 +350,12 @@ pub struct Sample {
     pub fighter: Option<Fighter>,
     pub p1_token: P1Token,
     pub p1_placed: Option<(u16, Fighter)>,
+    pub hand_token: HandToken,
+    pub p1_coin: P1Token,
+    pub p1_coin_at: Option<u16>,
+    pub cpu_token: P1Token,
+    pub cpu_placed: Option<(u16, Fighter)>,
+    pub carried_fighter: Option<Fighter>,
     pub resting: bool,
     pub step: Step,
 }
@@ -334,6 +389,12 @@ impl Owner {
                 fighter: None,
                 p1_token: P1Token::Unknown,
                 p1_placed: None,
+                hand_token: HandToken::Unknown,
+                p1_coin: P1Token::Unknown,
+                p1_coin_at: None,
+                cpu_token: P1Token::Unknown,
+                cpu_placed: None,
+                carried_fighter: None,
                 resting: false,
                 step: Step {
                     ack: 0,
@@ -345,6 +406,8 @@ impl Owner {
                     token: None,
                     last_written: 0,
                     settled_ack: None,
+                    token_step: false,
+                    token_target: None,
                 },
             },
         }
@@ -466,12 +529,12 @@ impl Publisher {
             return;
         }
         let rev = self.revision + 1;
-        let mut buf = Line::<1024>::new();
+        let mut buf = Line::<2048>::new();
         let step = s.step;
         let p1_view = active && s.local_seat != Some(1);
         let result = if !p1_view || step.dir.is_none() {
             "unknown"
-        } else if step.to.is_some() {
+        } else if step.to.is_some() || step.token_target.is_some() {
             "handled"
         } else {
             "edge"
@@ -662,7 +725,48 @@ impl Publisher {
                 .or_else(|| target_stage.map(|stage| PublishedName(stage.name(), false)))),
             step.blocked
         );
-        if buf.as_bytes().len() < 1024 && send(buf.as_bytes()) {
+        let hand = if css_grid && s.p1_carried.is_none() && s.resting {
+            s.hand_token
+        } else {
+            HandToken::Unknown
+        };
+        let hand_endpoint = match hand {
+            HandToken::Unknown => Endpoint::Unknown,
+            HandToken::None => Endpoint::None,
+            HandToken::Slot(slot) => Endpoint::Index(u16::from(slot)),
+        };
+        let coin_view = active && s.screen == Some(Screen::Css);
+        let p1_coin = if coin_view { s.p1_coin } else { P1Token::Unknown };
+        let cpu_token = if coin_view { s.cpu_token } else { P1Token::Unknown };
+        let cpu_placed = coin_view.then_some(s.cpu_placed).flatten();
+        let carried = p1_view.then_some(s.carried_fighter).flatten();
+        let target_token = match (p1_view, step.token_step, step.token_target) {
+            (false, _, _) => Endpoint::Unknown,
+            (true, true, Some(slot)) => Endpoint::Index(slot),
+            _ => Endpoint::None,
+        };
+        let token_settled = step.token_step
+            && step.ack == step.last_written
+            && match hand {
+                HandToken::Slot(slot) => step.token_target == Some(u16::from(slot)),
+                _ => false,
+            };
+        let _ = write!(
+            buf,
+            "\nhand.token={hand_endpoint}\np1.coin={}\np1.coin.at={}\ncpu.token={}\ncpu.placed.at={}\ncpu.placed.kind={}\ncpu.placed.name={}\ncpu.placed.form={}\ncarried.kind={}\ncarried.name={}\ncarried.form={}\ntarget.token={target_token}\ntoken.settled={}",
+            p1_coin.name(),
+            Field(coin_view.then_some(s.p1_coin_at).flatten()),
+            cpu_token.name(),
+            Field(cpu_placed.map(|x| x.0)),
+            Field(cpu_placed.and_then(|x| x.1.id())),
+            Field(cpu_placed.map(|x| PublishedName(x.1.name(), true))),
+            Field(cpu_placed.map(|_| "default")),
+            Field(carried.and_then(Fighter::id)),
+            Field(carried.map(|f| PublishedName(f.name(), true))),
+            Field(carried.map(|_| "default")),
+            u8::from(token_settled)
+        );
+        if buf.as_bytes().len() < 2048 && send(buf.as_bytes()) {
             self.revision = rev;
             self.sent = Some(identity);
         }

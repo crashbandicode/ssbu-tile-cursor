@@ -1,7 +1,7 @@
 //! Switch half: version check, guarded inline hooks, a static event ring and
 //! one writer thread. The two screen hooks run on the game's main thread at
 //! the start of the per-frame CSS players update and the stage select update.
-//! While P1's hand may step (on the CSS: while it carries a token) they poll
+//! While P1's hand may step they poll
 //! P1's controller through `nn::hid` (read-only), and on an L3 + D-pad step
 //! write the hand cursor's target, which the game's own cursor update then
 //! eases to. The third hook sits in that cursor update just before its
@@ -12,8 +12,8 @@
 //! allocations (expected 0) in the log.
 use crate::model::{
     self, cursor, describe, hand, input, neighbour, pack_blocked, pack_screen, pack_settled,
-    pack_step, tile_at, Line, PadInput, RawEvent, Rect, Screen, Site, Tiles, BUTTON_L3,
-    EV_BLOCKED, EV_SCREEN, EV_SETTLED, EV_STEP, PAD_RING, TICKS_PER_SECOND,
+    pack_step, pack_token, tile_at, Coins, Line, PadInput, RawEvent, Rect, Screen, Site, Tiles,
+    BUTTON_L3, EV_BLOCKED, EV_SCREEN, EV_SETTLED, EV_STEP, EV_TOKEN, PAD_RING, TICKS_PER_SECOND,
 };
 use core::cell::UnsafeCell;
 use core::fmt::Write as _;
@@ -399,7 +399,7 @@ pub(super) unsafe fn pad_gap() {
     (*STATE.0.get()).input.gap();
 }
 
-unsafe fn on_screen(screen: Screen, object: u64, view: &View) {
+unsafe fn on_screen(screen: Screen, object: u64, view: &View, coins: Option<&Coins>) {
     let state = &mut *STATE.0.get();
     let now = tick();
     if state.screen != Some((screen, object)) {
@@ -416,19 +416,24 @@ unsafe fn on_screen(screen: Screen, object: u64, view: &View) {
         );
     }
     // The D-pad filter follows the same gate as the steps.
-    if view.steppable {
+    let steppable = view.steppable || coins.is_some();
+    if steppable {
         LIVE_CURSOR.store(view.cursor, Ordering::Relaxed);
         LIVE_UNTIL.store(now + LIVE_TICKS, Ordering::Relaxed);
     } else {
         LIVE_UNTIL.store(0, Ordering::Relaxed);
     }
     let ring = p1_ring();
-    let frame = state.input.frame(
+    let mut frame = state.input.frame(
         (screen, object, view.cursor),
-        view.steppable,
+        steppable,
         ring.as_ref().map(|(source, samples, count)| (*source, &samples[..*count])),
         p1_buttons,
     );
+    if coins.is_some() {
+        frame = model::empty_hand(frame);
+        state.settle_cursor = 0;
+    }
     let current = read_point(view.cursor + cursor::CURRENT as u64);
     let target = read_point(view.cursor + cursor::TARGET as u64);
     if state.settle_cursor == view.cursor {
@@ -460,22 +465,38 @@ unsafe fn on_screen(screen: Screen, object: u64, view: &View) {
             ymin: read_f32(bounds_at + 8),
             ymax: read_f32(bounds_at + 12),
         };
-        // From the target, so held repeats accumulate whole tiles while the
-        // hand is still easing.
-        let step = neighbour(&view.tiles, target, dir, &bounds);
-        if step.to.is_some() {
-            let out = (view.cursor + cursor::TARGET as u64) as *mut f32;
-            for (i, value) in [step.target.0, step.target.1, 0.0, 0.0]
-                .into_iter()
-                .enumerate()
-            {
-                out.add(i).write_volatile(value);
+        if let Some(coins) = coins {
+            let selected = model::token_target(coins, dir)
+                .and_then(|slot| coins.at[slot].map(|point| (slot, bounds.clamp(point))));
+            let coin = selected.map(|(slot, _)| slot);
+            let point = selected.map_or(target, |(_, point)| point);
+            let from = tile_at(&view.tiles, current);
+            let to = coin.and_then(|_| tile_at(&view.tiles, point));
+            if coin.is_some() {
+                let out = (view.cursor + cursor::TARGET as u64) as *mut f32;
+                for (i, value) in [point.0, point.1, 0.0, 0.0].into_iter().enumerate() {
+                    out.add(i).write_volatile(value);
+                }
+                state.settle_cursor = 0;
             }
-            state.settle_cursor = view.cursor;
-            state.settle_frames = 0;
-            state.settle_token = view.token;
+            push_event(EV_TOKEN, pack_token(screen, dir, from, to, coin, point));
+        } else {
+            // From the target, so held repeats accumulate whole tiles while easing.
+            let step = neighbour(&view.tiles, target, dir, &bounds);
+            if step.to.is_some() {
+                let out = (view.cursor + cursor::TARGET as u64) as *mut f32;
+                for (i, value) in [step.target.0, step.target.1, 0.0, 0.0]
+                    .into_iter()
+                    .enumerate()
+                {
+                    out.add(i).write_volatile(value);
+                }
+                state.settle_cursor = view.cursor;
+                state.settle_frames = 0;
+                state.settle_token = view.token;
+            }
+            push_event(EV_STEP, pack_step(screen, dir, &step, view.token));
         }
-        push_event(EV_STEP, pack_step(screen, dir, &step, view.token));
     }
     if frame.blocked.iter().any(|&count| count != 0) {
         push_event(EV_BLOCKED, pack_blocked(screen, frame.blocked));
@@ -487,7 +508,7 @@ unsafe fn tile_cursor_css(ctx: &InlineCtx) {
     let css = ctx.registers[0].x();
     if valid(css) {
         if let Some(view) = css_view(css) {
-            on_screen(Screen::Css, css, &view);
+            on_screen(Screen::Css, css, &view, None);
             return;
         }
     }
@@ -499,7 +520,7 @@ unsafe fn tile_cursor_sss(ctx: &InlineCtx) {
     let sss = ctx.registers[0].x();
     if valid(sss) {
         if let Some(view) = sss_view(sss) {
-            on_screen(Screen::Sss, sss, &view);
+            on_screen(Screen::Sss, sss, &view, None);
             return;
         }
     }

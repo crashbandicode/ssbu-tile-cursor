@@ -1131,6 +1131,7 @@ fn css_mid_move_has_a_reliable_phase() {
             token: Some(0),
             last_written: 11,
             settled_ack: None,
+            ..Step::default()
         },
         ..Sample::default()
     };
@@ -1164,6 +1165,7 @@ fn css_reliability_sample(ack: u64) -> Sample {
             token: Some(0),
             last_written: ack,
             settled_ack: None,
+            ..Step::default()
         },
         ..Sample::default()
     }
@@ -1345,7 +1347,7 @@ fn stale_no_screen_and_guest_have_unknown_phase_and_target() {
 fn appended_state_keys_preserve_legacy_order() {
     let actual = block(&mut Publisher::default(), 1, Some(css_reliability_sample(11)), true);
     let keys: Vec<_> = actual.lines().map(|line| line.split_once('=').unwrap().0).collect();
-    assert_eq!(keys, [
+    assert_eq!(&keys[..43], &[
         "schema", "rev", "boot", "ack", "ack.result", "focus", "observation",
         "observation.active", "screen", "generation", "layout", "grid", "at", "hovered",
         "kind", "name", "form", "controller", "seat", "carried", "p1.carried", "p1.token",
@@ -1371,12 +1373,13 @@ fn all_css_stock_targets_fit_worst_case_legacy_content() {
                     ack: u64::MAX, blocked: u64::MAX, applied: u64::MAX, last_written: u64::MAX,
                     dir: Some(Dir::Right), from: Some(u16::MAX), to: Some(longest),
                     token: carried, settled_ack: Some(u64::MAX),
+                    ..Step::default()
                 },
                 ..Sample::default()
             };
             let actual = block(&mut Publisher::default(), 1, Some(sample), true);
             assert!(!actual.is_empty(), "no publication for target {target} and {token:?}");
-            assert!(actual.len() < 1024, "target {target} and {token:?}: {}", actual.len());
+            assert!(actual.len() < 2048, "target {target} and {token:?}: {}", actual.len());
         }
     }
 }
@@ -1389,7 +1392,7 @@ fn blocked_counter_is_appended_and_survives_owner_changes() {
     let a = block(&mut Publisher::default(), 1, Some(original), true);
     let b = block(&mut Publisher::default(), 1, Some(changed), true);
     assert_eq!(a.lines().take(42).collect::<Vec<_>>(), b.lines().take(42).collect::<Vec<_>>());
-    assert_eq!(b.lines().count(), 43);
+    assert_eq!(b.lines().count(), 56);
     assert_eq!(b.lines().nth(42), Some("blocked=2"));
     changed.step.new_owner();
     assert_eq!(changed.step.blocked, 2);

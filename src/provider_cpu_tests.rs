@@ -107,9 +107,11 @@ fn the_new_lines_follow_the_old_lines_in_wire_order() {
 fn the_cpu_medal_reports_its_tile_and_fighter() {
     let random = fighter_identity(86, RANDOM, [RANDOM, SENTINEL], [0, 0], true);
     assert_eq!(random, Some(Fighter(86)));
+    let medal_rect = Rect { xmin: 504.0, xmax: 648.0, ymin: -118.0, ymax: -36.0 };
+    assert_eq!(css_rectangles()[86], medal_rect);
     let mut facts = MedalFacts {
         carried: -1, holding: 0, visible: 1, grabbed: 0, panel_flags: [0, 1],
-        placed: Some(86), rect_matches: true, placed_fighter: random,
+        placed: Some(86), rect_matches: css_rectangles()[86] == medal_rect, placed_fighter: random,
     };
     assert_eq!(facts.coin(1), P1Token::Placed);
     lines(&wire(sample()), &[
@@ -160,6 +162,10 @@ fn coins_are_offered_by_the_games_own_test() {
     pane.pane = None;
     assert_eq!(coin_offer(1, &pane, area()), None);
     assert_eq!(coin_offer(1, &valid, Rect { xmax: 575.0, ..area() }), None);
+    let mut boundary = measured_facts();
+    boundary.rest = [(960.0, 458.0); 2];
+    boundary.pane = Some((960.0, 458.0));
+    assert_eq!(coin_offer(1, &boundary, area()), Some((960.0, 458.0)));
 }
 
 #[test]
@@ -203,7 +209,8 @@ fn a_carried_cpu_coin_reports_its_hover_and_leaves_p1_placed() {
         placed: Some(67), rect_matches: true, placed_fighter: Some(Fighter(67)),
     };
     assert_eq!(held.coin(1), P1Token::Held);
-    assert_eq!(held.coin(0), P1Token::Placed);
+    let own = MedalFacts { grabbed: 0, ..held };
+    assert_eq!(own.coin(0), P1Token::Placed);
 }
 
 #[test]
@@ -258,6 +265,7 @@ fn the_longest_block_fits_its_buffer() {
     };
     let value = wire(longest);
     assert!(!value.is_empty(), "publisher refused longest sample");
+    println!("longest block: {} bytes", value.len());
     assert!(value.len() <= 2048, "length {}", value.len());
     assert_eq!(value.lines().count(), 56);
 }
@@ -347,7 +355,16 @@ fn a_token_step_shows_in_the_old_lines_only_as_a_step() {
     let (no_tile, _) = pack_token(Screen::Css, Dir::Left, Some(45), None, Some(1), (1.0, 1.0));
     let mut no_tile_step = Step::default();
     no_tile_step.token_emitted(no_tile);
-    lines(&wire(Sample { step: no_tile_step, ..value }), &["ack.result=handled", "target.token=1"]);
+    lines(&wire(Sample { step: no_tile_step, ..value }), &[
+        "ack.result=handled", "applied=1", "target.token=1",
+    ]);
+    no_tile_step.emitted(crate::model::pack_step(
+        Screen::Css, Dir::Right,
+        &crate::model::Step { from: Some(1), to: Some(2), target: (0.0, 0.0) },
+        Some(0),
+    ).0);
+    assert!(!no_tile_step.token_step);
+    assert_eq!(no_tile_step.token_target, None);
 }
 
 #[test]

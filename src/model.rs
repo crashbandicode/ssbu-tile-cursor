@@ -12,11 +12,13 @@
 //! centre therefore moves the hand exactly one tile, through the game's own
 //! movement, whatever the frame pacing.
 //!
-//! On the CSS a step needs P1's hand to be carrying a token (its own or a
-//! CPU's): the game records the hovered fighter for the carried token's slot,
-//! and an empty hand only points at tokens and buttons.
+//! On the CSS a tile step needs P1's hand to carry a token. The observed
+//! Training owner can also step an empty hand between game-offered coins.
 
 use core::fmt;
+
+#[path = "cpu_guards.rs"]
+pub mod cpu_guards;
 
 pub const SUPPORTED_VERSION: &str = "13.0.5";
 
@@ -202,6 +204,9 @@ pub mod hand {
     pub const CURSOR: usize = 0x100;
     /// Non-zero while the hand is shown and enabled (`set_hand_enable`).
     pub const ENABLED: usize = 0x163;
+    pub const AREA: usize = 0x148;
+    pub const SHOWN: usize = 0x162;
+    pub const HOVERING: usize = 0x166;
     /// Non-zero while the hand holds a token (set and cleared together with
     /// the player's carried slot).
     pub const HOLDING: usize = 0x167;
@@ -224,10 +229,14 @@ pub mod css {
     /// checks before hit-testing.
     pub const PLAYER_HAND: usize = 0x20;
     pub const PLAYER_INDEX: usize = 0x28;
+    pub const PLAYER_HOVER_TOKEN: usize = 0x2c;
     pub const PLAYER_CARRIED: usize = 0x30;
     pub const PLAYER_ACTIVE: usize = 0x36;
     /// Player and token slots.
     pub const SLOTS: usize = 8;
+    pub const MEDALS: usize = 0xdf0;
+    pub const MEDAL_STRIDE: usize = 0x130;
+    pub const MEDAL_COUNT: usize = 0xbe0;
     /// Fighter tiles: an object whose `+0`/`+8` are a vector's begin/end.
     pub const TILES: usize = 0xdd0;
     pub const TILE_STRIDE: usize = 0xb0;
@@ -455,6 +464,15 @@ pub struct PadFrame {
     pub blocked: [u8; 4],
 }
 
+pub fn empty_hand(mut frame: PadFrame) -> PadFrame {
+    if let Some(dir @ (Dir::Up | Dir::Down)) = frame.step {
+        frame.step = None;
+        let count = &mut frame.blocked[dir as usize];
+        *count = count.saturating_add(1);
+    }
+    frame
+}
+
 #[derive(Clone, Copy, Eq, PartialEq)]
 enum Prev {
     Gap,
@@ -598,6 +616,44 @@ impl Rect {
             x.max(self.xmin).min(self.xmax),
             y.max(self.ymin).min(self.ymax),
         )
+    }
+}
+
+pub struct Coins {
+    pub pointed: Option<usize>,
+    pub at: [Option<(f32, f32)>; css::SLOTS],
+}
+
+pub struct CoinFacts {
+    pub flags: [u8; 8],
+    pub rest: [(f32, f32); 2],
+    pub pane: Option<(f32, f32)>,
+}
+
+pub fn coin_offer(slot: usize, facts: &CoinFacts, area: Rect) -> Option<(f32, f32)> {
+    let flags = facts.flags;
+    let position = facts.pane?;
+    (slot < 2
+        && flags[0] != 0
+        && flags[1] != 0
+        && flags[3] != 0
+        && flags[4] != 0
+        && flags[7] == 0
+        && (slot == 0 || flags[5] == 0)
+        && facts.rest[0] == facts.rest[1]
+        && position == facts.rest[0]
+        && area.contains(position.0, position.1))
+        .then_some(position)
+}
+
+pub fn token_target(coins: &Coins, dir: Dir) -> Option<usize> {
+    match dir {
+        Dir::Right => (0..coins.at.len())
+            .find(|&slot| coins.at[slot].is_some() && coins.pointed.is_none_or(|p| slot > p)),
+        Dir::Left => (0..coins.at.len())
+            .rev()
+            .find(|&slot| coins.at[slot].is_some() && coins.pointed.is_none_or(|p| slot < p)),
+        Dir::Up | Dir::Down => None,
     }
 }
 
@@ -790,6 +846,7 @@ pub const EV_SCREEN: u8 = 1;
 pub const EV_STEP: u8 = 2;
 pub const EV_SETTLED: u8 = 3;
 pub const EV_BLOCKED: u8 = 4;
+pub const EV_TOKEN: u8 = 5;
 
 const NONE16: u64 = 0xffff;
 
@@ -836,6 +893,17 @@ pub fn pack_step(screen: Screen, dir: Dir, step: &Step, token: Option<usize>) ->
             | pack_index(token) << 48,
         pack_point(step.target),
     )
+}
+
+pub fn pack_token(
+    screen: Screen,
+    dir: Dir,
+    from: Option<usize>,
+    to: Option<usize>,
+    coin: Option<usize>,
+    point: (f32, f32),
+) -> (u64, u64) {
+    pack_step(screen, dir, &Step { from, to, target: point }, coin)
 }
 
 pub fn pack_blocked(screen: Screen, counts: [u8; 4]) -> (u64, u64) {
@@ -901,6 +969,23 @@ pub fn describe(event: &RawEvent, out: &mut impl fmt::Write) -> fmt::Result {
                 Token(a >> 48 & 0xffff)
             )
         }
+        EV_TOKEN => {
+            let (x, y) = unpack_point(b);
+            let dir = Dir::from_code((a >> 8 & 0xff) as u8).map_or("?", Dir::name);
+            let coin = a >> 48 & 0xffff;
+            write!(
+                out,
+                "token screen={screen} dir={dir} from={} to={} coin=",
+                Index(a >> 16 & 0xffff),
+                Index(a >> 32 & 0xffff)
+            )?;
+            if coin == NONE16 {
+                write!(out, "none")?;
+            } else {
+                write!(out, "p{}", coin + 1)?;
+            }
+            write!(out, " x={x:.1} y={y:.1}")
+        }
         EV_BLOCKED => {
             let counts = unpack_blocked(a);
             let directions = counts.iter().filter(|&&count| count != 0).count();
@@ -955,6 +1040,18 @@ mod tests {
         ];
         for (site, head) in SITES.iter().zip(heads) {
             assert_eq!(site.guard[..4], head, "{}", site.name);
+        }
+        let optional = [
+            &cpu_guards::CSS_MEDAL_COUNT,
+            &cpu_guards::CSS_HOVER_HAND_AREA,
+            &cpu_guards::CSS_HOVER_MEDAL_FLAGS,
+            &cpu_guards::CSS_HOVER_MEDAL_POSITION,
+            &cpu_guards::CSS_HOVER_TOKEN_WRITE,
+            &cpu_guards::CSS_GRAB_HOVER_TOKEN,
+        ];
+        let heads = include_bytes!("layouts/cpu-guard-heads.bin");
+        for (site, head) in optional.into_iter().zip(heads.chunks_exact(8)) {
+            assert_eq!(&site.guard[..8], head, "{}", site.name);
         }
         // The query site is followed by the call it feeds: bl 0x3763840.
         let bl = u32::from_le_bytes([
