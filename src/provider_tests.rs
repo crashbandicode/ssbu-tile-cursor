@@ -2,6 +2,142 @@ use super::*;
 use crate::css_table::CSS_GEOMETRY;
 use crate::model::{pack_step, Step as NativeStep};
 
+const SENTINEL: u64 = 0xc1ff_ff00_0000_0000;
+const MYTHRA: u64 = 0xc100_7414_c6fc_852a;
+
+#[test]
+fn a_sample_stamped_after_the_clock_reading_stays_active() {
+    use crate::layout::Layout;
+
+    let sample = Sample {
+        screen: Some(Screen::Css),
+        grid: Some(Layout::Css),
+        local_seat: Some(0),
+        tick: 100,
+        observation: 1,
+        at: Some(67),
+        hover: Some(67),
+        p1_carried: Some(0),
+        p1_token: P1Token::Held,
+        resting: true,
+        fighter: Some(Fighter(67)),
+        ..Sample::default()
+    };
+    let actual = block(&mut Publisher::default(), 99, Some(sample), true);
+    for line in ["\nobservation.active=1\n", "\nscreen=css\n", "\nphase=settled\n", "\nname=\"Richter\"\n"] {
+        assert!(actual.contains(line), "expected {line:?}: {actual}");
+    }
+}
+
+#[test]
+fn a_late_clock_reading_at_rest_does_not_interrupt_the_settled_block() {
+    let mut publisher = Publisher::default();
+    for (observation, tick, now) in [(1, 10, 12), (2, 20, 19), (3, 30, 31)] {
+        let sample = Sample {
+            observation,
+            tick,
+            at: Some(0),
+            target: Some(0),
+            hover: Some(0),
+            fighter: Some(Fighter(0)),
+            resting: true,
+            step: Step {
+                ack: 24,
+                applied: 24,
+                dir: Some(Dir::Left),
+                from: Some(1),
+                to: Some(0),
+                token: Some(0),
+                last_written: 24,
+                settled_ack: Some(24),
+                ..Step::default()
+            },
+            ..css_reliability_sample(24)
+        };
+        let actual = block(&mut publisher, now, Some(sample), true);
+        let revision = format!("rev={observation}");
+        let observed = format!("observation={observation}");
+        assert_lines(&actual, &[
+            &revision, &observed, "observation.active=1", "focus=css.grid.mario",
+            "settled=1", "phase=settled", "direction=left", "from=1", "to=0",
+            "settled.ack=24",
+        ]);
+    }
+}
+
+#[test]
+fn staleness_bound_is_unchanged() {
+    let sample = Sample {
+        screen: Some(Screen::Css),
+        tick: 10,
+        observation: 1,
+        ..Sample::default()
+    };
+    let mut publisher = Publisher::default();
+    let active = block(&mut publisher, 10 + MAX_AGE, Some(sample), true);
+    assert_lines(&active, &["observation.active=1"]);
+    let expired = block(&mut publisher, 11 + MAX_AGE, None, true);
+    assert_lines(&expired, &["observation.active=0", "phase=unknown"]);
+}
+
+#[test]
+fn fighter_identity_follows_the_native_variant_lookup() {
+    let richter = CSS_TILES[67].word;
+    let pyra = CSS_TILES[80].word;
+    for variant in [[1, 0], [0, 1], [1, 1]] {
+        assert_eq!(
+            fighter_identity(67, richter, [richter, SENTINEL], variant, true),
+            Some(Fighter(67))
+        );
+    }
+    assert_eq!(fighter_identity(67, richter, [richter, 0], [1, 0], true), Some(Fighter(67)));
+    assert_eq!(fighter_identity(80, pyra, [pyra, MYTHRA], [0, 0], true), Some(Fighter(80)));
+    assert_eq!(fighter_identity(80, pyra, [pyra, MYTHRA], [0, 1], true), None);
+    assert_eq!(fighter_identity(80, MYTHRA, [pyra, MYTHRA], [0, 1], true), None);
+    assert_eq!(fighter_identity(80, MYTHRA, [pyra, MYTHRA], [0, 0], true), None);
+    assert_eq!(fighter_identity(67, richter, [richter, SENTINEL], [1, 0], false), None);
+    assert_eq!(fighter_identity(66, richter, [richter, SENTINEL], [1, 0], true), None);
+    assert_eq!(fighter_identity(67, richter ^ 1, [richter, SENTINEL], [1, 0], true), None);
+}
+
+#[test]
+fn a_restored_echo_fighter_reads_placed() {
+    use crate::layout::Layout;
+
+    let richter = CSS_TILES[67].word;
+    let fighter = fighter_identity(67, richter, [richter, SENTINEL], [1, 0], true);
+    let token = MedalFacts {
+        carried: -1,
+        holding: 0,
+        visible: 1,
+        grabbed: 0,
+        panel_flags: [0, 1],
+        placed: Some(67),
+        rect_matches: true,
+        placed_fighter: fighter,
+    }.token();
+    assert_eq!(token, P1Token::Placed);
+    let sample = Sample {
+        screen: Some(Screen::Css),
+        grid: Some(Layout::Css),
+        local_seat: Some(0),
+        tick: 1,
+        observation: 1,
+        resting: true,
+        at: None,
+        hover: None,
+        p1_carried: None,
+        p1_token: token,
+        p1_placed: Some((67, fighter.unwrap())),
+        ..Sample::default()
+    };
+    let actual = block(&mut Publisher::default(), 1, Some(sample), true);
+    assert_lines(&actual, &[
+        "p1.token=placed", "local.token=placed", "carried=none", "placed.at=67",
+        "placed.kind=68", "placed.name=\"Richter\"", "focus=css.medal.richter", "phase=resting",
+    ]);
+}
+
 fn api() -> Api {
     extern "C" fn register(name: *const u8, len: u32, id: u32, version: u32) -> i32 {
         let name = unsafe { core::slice::from_raw_parts(name, len as usize) };
@@ -91,7 +227,7 @@ fn generated_table_reproduces_the_captured_stock_layout() {
 fn css_table_identifies_every_stock_fighter_tile() {
     let identify = |index: usize| {
         let word = CSS_TILES[index].word;
-        fighter_identity(index as u16, word, word, [0, 0], true).expect("stock CSS tile")
+        fighter_identity(index as u16, word, [word, SENTINEL], [0, 0], true).expect("stock CSS tile")
     };
     for index in 0..CSS_TILES.len() {
         assert_eq!(identify(index).tile(), index as u16);
@@ -109,19 +245,19 @@ fn css_table_identifies_every_stock_fighter_tile() {
     }
     let richter = CSS_TILES[67].word;
     assert_eq!(
-        fighter_identity(66, richter, richter, [0, 0], true),
+        fighter_identity(66, richter, [richter, SENTINEL], [0, 0], true),
         None
     );
     assert_eq!(
-        fighter_identity(67, richter, richter, [1, 0], true),
+        fighter_identity(67, richter, [richter, MYTHRA], [1, 0], true),
         None
     );
     assert_eq!(
-        fighter_identity(67, richter, richter, [0, 0], false),
+        fighter_identity(67, richter, [richter, SENTINEL], [0, 0], false),
         None
     );
     assert_eq!(
-        fighter_identity(67, richter ^ 1, richter, [0, 0], true),
+        fighter_identity(67, richter ^ 1, [richter, SENTINEL], [0, 0], true),
         None
     );
 }
@@ -446,12 +582,12 @@ fn overwritten_mailbox_preserves_newest_complete_owner_and_counters() {
 fn observed_default_steve_requires_matching_typed_tile_and_current_panel() {
     let typed = 0xc100_700f_dc91_574e;
     let good = |index, panel, tile, variant, settled| {
-        fighter_identity(index, panel, tile, variant, settled)
+        fighter_identity(index, panel, [tile, SENTINEL], variant, settled)
     };
     assert_eq!(good(78, typed, typed, [0, 0], true), Some(Fighter(78)));
     assert_eq!(good(78, 0xc1ff_ff00_0000_0000, typed, [0, 0], true), None);
-    assert_eq!(good(78, typed, typed, [1, 0], true), None);
-    assert_eq!(good(78, typed, typed, [0, 1], true), None);
+    assert_eq!(fighter_identity(78, typed, [typed, MYTHRA], [1, 0], true), None);
+    assert_eq!(fighter_identity(78, typed, [typed, MYTHRA], [0, 1], true), None);
     assert_eq!(good(78, typed, typed, [0, 0], false), None);
     assert_eq!(good(66, typed, typed, [0, 0], true), None);
     assert_eq!(good(78, typed, typed ^ 1, [0, 0], true), None);
