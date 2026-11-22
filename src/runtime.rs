@@ -12,8 +12,8 @@
 //! allocations (expected 0) in the log.
 use crate::model::{
     self, cursor, describe, hand, input, neighbour, pack_blocked, pack_screen, pack_settled,
-    pack_step, pack_token, tile_at, Coins, Line, PadInput, RawEvent, Rect, Screen, Site, Tiles,
-    BUTTON_L3, EV_BLOCKED, EV_SCREEN, EV_SETTLED, EV_STEP, EV_TOKEN, PAD_RING, TICKS_PER_SECOND,
+    pack_step, pack_take, pack_token, tile_at, Coins, Line, PadInput, RawEvent, Rect, Screen, Site, Take, TakePress, Tiles,
+    BUTTON_L3, EV_BLOCKED, EV_SCREEN, EV_SETTLED, EV_STEP, EV_TAKE, EV_TOKEN, PAD_RING, TICKS_PER_SECOND,
 };
 use core::cell::UnsafeCell;
 use core::fmt::Write as _;
@@ -87,6 +87,8 @@ static EVENTS: [EventSlot; EVENT_RING] = [const {
     }
 }; EVENT_RING];
 static EVENT_HEAD: AtomicU64 = AtomicU64::new(0);
+static TAKE_ACK: AtomicU64 = AtomicU64::new(0);
+static TAKE_APPLIED: AtomicU64 = AtomicU64::new(0);
 
 /// P1's hand cursor as last seen by a screen hook, and until when that holds.
 static LIVE_CURSOR: AtomicU64 = AtomicU64::new(0);
@@ -99,6 +101,7 @@ static PAD_GC: AtomicU64 = AtomicU64::new(0);
 /// State only the two screen hooks touch; both run on the game's main thread.
 struct GameState {
     input: PadInput,
+    take: TakePress,
     screen: Option<(Screen, u64)>,
     /// The cursor whose step is waiting to settle, settled frames seen, and
     /// the token slot the hand carried for that step (CSS).
@@ -111,6 +114,7 @@ struct Shared(UnsafeCell<GameState>);
 unsafe impl Sync for Shared {}
 static STATE: Shared = Shared(UnsafeCell::new(GameState {
     input: PadInput::new(),
+    take: TakePress::new(),
     screen: None,
     settle_cursor: 0,
     settle_frames: 0,
@@ -300,7 +304,7 @@ unsafe fn sss_view(sss: u64) -> Option<View> {
 
 /// P1's buttons (`nn::hid` bits): controller No.1 or handheld, read-only.
 fn p1_buttons() -> u64 {
-    unsafe fn poll(id: u32) -> u64 {
+    unsafe fn poll_buttons(id: u32) -> u64 {
         let style = nn::hid::GetNpadStyleSet(&id).flags;
         if style & STYLE_GC != 0 {
             let mut state = nn::hid::NpadGcState::default();
@@ -319,7 +323,7 @@ fn p1_buttons() -> u64 {
         }
         state.Buttons
     }
-    unsafe { poll(NPAD_NO1) | poll(NPAD_HANDHELD) }
+    unsafe { poll_buttons(NPAD_NO1) | poll_buttons(NPAD_HANDHELD) }
 }
 
 fn resolve_pad_ring() {
@@ -405,6 +409,7 @@ unsafe fn on_screen(screen: Screen, object: u64, view: &View, coins: Option<&Coi
     if state.screen != Some((screen, object)) {
         state.screen = Some((screen, object));
         state.input.reset();
+        state.take = TakePress::new();
         state.settle_cursor = 0;
         push_event(
             EV_SCREEN,
@@ -424,11 +429,18 @@ unsafe fn on_screen(screen: Screen, object: u64, view: &View, coins: Option<&Coi
         LIVE_UNTIL.store(0, Ordering::Relaxed);
     }
     let ring = p1_ring();
+    let fallback = ring.is_none().then(p1_buttons);
+    if screen == Screen::Css {
+        let buttons = ring.as_ref().map_or_else(|| fallback.unwrap_or(0), |(_, samples, _)| samples[0].1);
+        if state.take.update(buttons) {
+            TAKE_ACK.fetch_add(1, Ordering::Relaxed);
+        }
+    }
     let mut frame = state.input.frame(
         (screen, object, view.cursor),
         steppable,
         ring.as_ref().map(|(source, samples, count)| (*source, &samples[..*count])),
-        p1_buttons,
+        || fallback.unwrap_or(0),
     );
     if coins.is_some() {
         frame = model::empty_hand(frame);
@@ -559,13 +571,42 @@ unsafe fn stage_owner_resumed(ctx: &InlineCtx) {
     observed::stage_resumed(ctx.registers[19].x());
 }
 
-fn install_cursor_hooks(observe: bool) {
+/// In the fighter-picking update, at `cmn w21, #1`: the game has read a B press of the player in x8, whose
+/// hand is empty, and w21 is the coin that hand points at (-1 for none). For P1's L3 + B on Training's
+/// two-seat fighter select the game picks up the CPU's coin instead (w21 = 1), or nothing when it does not
+/// offer that coin now (w21 = -1 and w9 = 0, which closes its take-own-coin-back branch). Registers only.
+#[skyline::hook(offset = model::CSS_TAKE_OFFSET, inline)]
+unsafe fn tile_cursor_take(ctx: &mut InlineCtx) {
+    if p1_buttons() & BUTTON_L3 == 0 {
+        return;
+    }
+    let (css, player) = (ctx.registers[19].x(), ctx.registers[8].x());
+    if !valid(css) || !valid(player) {
+        return;
+    }
+    let coins = css_view(css).and_then(|view| observed::take_coins(css, &view));
+    let take = model::take(true, read_i32(player + model::css::PLAYER_INDEX as u64), coins.as_ref());
+    if take != Take::Native {
+        let (pointed, own) = model::take_registers(take, ctx.registers[21].w(), ctx.registers[9].w());
+        ctx.registers[21].set_x(u64::from(pointed));
+        ctx.registers[9].set_x(u64::from(own));
+    }
+    if let Take::Coin(slot) = take {
+        TAKE_APPLIED.fetch_add(1, Ordering::Relaxed);
+        push_event(EV_TAKE, pack_take(Screen::Css, slot));
+    }
+}
+
+fn install_cursor_hooks(observe: bool, take: bool) {
     if observe {
         observed::prepare_stage();
         skyline::install_hooks!(observed_css, observed_sss, tile_cursor_query);
         skyline::install_hooks!(stage_actor_return, stage_owner_resumed);
     } else {
         skyline::install_hooks!(tile_cursor_css, tile_cursor_sss, tile_cursor_query);
+    }
+    if take {
+        skyline::install_hooks!(tile_cursor_take);
     }
 }
 
@@ -826,10 +867,20 @@ pub fn main() {
     } else {
         false
     };
-    install_cursor_hooks(observe);
+    let take = match observed::take_mismatch() {
+        None => true,
+        Some(site) => {
+            let _ = write!(report, " take_guard={site}");
+            false
+        }
+    };
+    install_cursor_hooks(observe, take);
     let _ = write!(report, " hooks=css,sss,cursor_query");
     if observe {
         let _ = write!(report, " observed=1");
+    }
+    if take {
+        let _ = write!(report, " take=1");
     }
     report_install(&mut report, true);
     observed::installation_reported();

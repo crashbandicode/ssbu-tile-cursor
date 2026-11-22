@@ -93,6 +93,15 @@ pub(super) fn optional_mismatch() -> Option<&'static str> {
         .map(|s| s.name)
 }
 
+pub(super) fn take_mismatch() -> Option<&'static str> {
+    if !stock_build() {
+        return Some("build_id");
+    }
+    p1::GUARDS.iter().chain(model::TAKE_SITES)
+        .find(|site| !unsafe { guard_matches(site) })
+        .map(|site| site.name)
+}
+
 pub(super) fn prepare_stage() {
     stage_reader::prepare(unsafe { getRegionAddress(Region::Text) } as u64);
 }
@@ -194,6 +203,14 @@ unsafe fn grid(screen: Screen, view: &View) -> Option<crate::layout::Layout> {
     )
 }
 
+unsafe fn offered(layout: Option<crate::layout::Layout>, css: u64, view: &View) -> Option<Coins> {
+    (layout == Some(crate::layout::Layout::Css)).then(|| p1::coins(css, view)).flatten()
+}
+
+pub(super) unsafe fn take_coins(css: u64, view: &View) -> Option<Coins> {
+    offered(grid(Screen::Css, view), css, view)
+}
+
 pub(super) unsafe fn observe(screen: Screen, object: u64, view: Option<View>) {
     stage_reader::close_update();
     let owner = &mut *OWNER.0.get();
@@ -222,14 +239,16 @@ pub(super) unsafe fn observe(screen: Screen, object: u64, view: Option<View>) {
     // Its STEP record is emitted after the native target write (or a blocked edge).
     let first = EVENT_HEAD.load(Ordering::Relaxed);
     let layout = grid(screen, &view);
-    let coins = if screen == Screen::Css && layout == Some(crate::layout::Layout::Css) {
-        p1::coins(object, &view)
+    let coins = if screen == Screen::Css {
+        offered(layout, object, &view)
     } else {
         None
     };
     on_screen(screen, object, &view, coins.as_ref());
     let last = EVENT_HEAD.load(Ordering::Relaxed);
     let sample = &mut owner.latest;
+    sample.step.take_ack = TAKE_ACK.load(Ordering::Relaxed);
+    sample.step.take_applied = TAKE_APPLIED.load(Ordering::Relaxed);
     let current = read_point(view.cursor + cursor::CURRENT as u64);
     let target = read_point(view.cursor + cursor::TARGET as u64);
     sample.at = tile_at(&view.tiles, current).map(|i| i as u16);

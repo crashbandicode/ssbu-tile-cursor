@@ -5,7 +5,7 @@ fn chooses_owner_once_at_install_after_weak_registration() {
     let runtime = include_str!("runtime.rs");
     let main = runtime.split("pub fn main() {").last().unwrap();
     assert!(
-        main.contains("install_cursor_hooks(observe)"),
+        main.contains("install_cursor_hooks(observe, take)"),
         "Tile Cursor must select observed or standalone owners only at guarded install"
     );
     let hooks = runtime
@@ -14,6 +14,8 @@ fn chooses_owner_once_at_install_after_weak_registration() {
         .expect("startup hook installer");
     assert!(hooks.contains("tile_cursor_css, tile_cursor_sss, tile_cursor_query"));
     assert!(hooks.contains("observed_css, observed_sss, tile_cursor_query"));
+    assert!(hooks.contains("if take {") && hooks.contains("skyline::install_hooks!(tile_cursor_take)"));
+    assert!(main.contains("observed::take_mismatch()"));
 }
 
 #[test]

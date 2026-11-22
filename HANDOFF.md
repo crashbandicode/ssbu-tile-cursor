@@ -121,3 +121,12 @@ cargo skyline build --release
 cargo skyline build --release --features diag
 python3 -I ~/ssbu-mod-playbook/tools/check/compliance.py . --nro <release NRO> --base 236c98d --trace <gate>/DESIGN-TRACE.md
 ```
+
+## CPU coin take
+
+L3 + B takes the offered CPU coin into P1's empty hand on the captured two-seat
+fighter select; the game's B remains unchanged outside the scope. The new
+bridge counters are `take.ack` and `take.applied`. Console pad-id recognition,
+the CPU-held analogy and the fighter select's internal state are not measured;
+the game still sees held B. Evidence and the requirement trace are under
+`artifacts/phase23/tile-take/`; independent review and Eden proof remain open.

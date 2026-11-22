@@ -87,7 +87,8 @@ fn audit(sources: &[&str], roots: &[&str]) -> (BTreeSet<String>, Vec<String>) {
                     || t.contains("QueryMemory")
                     || t.ends_with("Mutex")
                     || t.ends_with("Event")
-                    || (t == "nn" && name != "tick")
+                    || (t == "nn" && !matches!(name.as_str(), "tick" | "p1_buttons" | "poll_buttons"))
+                    || (t == "p1_buttons" && name != "tile_cursor_take")
                     || matches!(t.as_str(), "skyline" | "nnsdk" | "std")
                     || matches!(
                         t.as_str(),
@@ -115,7 +116,6 @@ fn audit(sources: &[&str], roots: &[&str]) -> (BTreeSet<String>, Vec<String>) {
                             | "poll"
                             | "publish"
                             | "transmute"
-                            | "p1_buttons"
                     )
                 {
                     violations.push(format!("{name} reaches {t}"));
@@ -181,6 +181,12 @@ fn lock_order_optional_owners_reach_only_nonblocking_capture() {
     }
     let (_, token_violations) = audit(&sources, &["empty_hand", "token_target", "pack_token"]);
     assert!(token_violations.is_empty(), "{token_violations:?}");
+    let (take_reached, take_violations) = audit(&sources, &["tile_cursor_take"]);
+    assert!(take_violations.is_empty(), "{take_violations:?}");
+    for name in ["tile_cursor_take", "p1_buttons", "poll_buttons", "css_view", "take_coins", "offered",
+                 "grid", "coins", "coin_offer", "take", "take_registers", "push_event"] {
+        assert!(take_reached.contains(name), "missing take path to {name}");
+    }
 }
 
 #[test]

@@ -163,6 +163,8 @@ impl Step {
             ack: self.ack,
             blocked: self.blocked,
             applied: self.applied,
+            take_ack: self.take_ack,
+            take_applied: self.take_applied,
             ..Self::default()
         };
     }
@@ -773,7 +775,7 @@ impl Publisher {
             };
         let _ = write!(
             buf,
-            "\nhand.token={hand_endpoint}\np1.coin={}\np1.coin.at={}\ncpu.token={}\ncpu.placed.at={}\ncpu.placed.kind={}\ncpu.placed.name={}\ncpu.placed.form={}\ncarried.kind={}\ncarried.name={}\ncarried.form={}\ntarget.token={target_token}\ntoken.settled={}",
+            "\nhand.token={hand_endpoint}\np1.coin={}\np1.coin.at={}\ncpu.token={}\ncpu.placed.at={}\ncpu.placed.kind={}\ncpu.placed.name={}\ncpu.placed.form={}\ncarried.kind={}\ncarried.name={}\ncarried.form={}\ntarget.token={target_token}\ntoken.settled={}\ntake.ack={}\ntake.applied={}",
             p1_coin.name(),
             Field(coin_view.then_some(s.p1_coin_at).flatten()),
             cpu_token.name(),
@@ -784,7 +786,9 @@ impl Publisher {
             Field(carried.and_then(Fighter::id)),
             Field(carried.map(|f| PublishedName(f.name(), true))),
             Field(carried.map(|_| "default")),
-            u8::from(token_settled)
+            u8::from(token_settled),
+            step.take_ack,
+            step.take_applied
         );
         if buf.as_bytes().len() < 2048 && send(buf.as_bytes()) {
             self.revision = rev;

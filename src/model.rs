@@ -21,6 +21,8 @@ use core::fmt;
 pub mod cpu_guards;
 
 pub const SUPPORTED_VERSION: &str = "13.0.5";
+pub const CSS_TAKE_OFFSET: usize = 0x1a14664;
+pub use cpu_guards::TAKE_SITES;
 
 /// A 13.0.5 `.text` offset and the 64 bytes that must be there.
 pub struct Site {
@@ -301,8 +303,11 @@ impl TakePress {
         Self { primed: false, b_down: false }
     }
 
-    pub fn update(&mut self, _buttons: u64) -> bool {
-        false
+    pub fn update(&mut self, buttons: u64) -> bool {
+        let b_down = buttons & BUTTON_B != 0;
+        let press = self.primed && b_down && !self.b_down && buttons & BUTTON_L3 != 0;
+        *self = Self { primed: true, b_down };
+        press
     }
 }
 
@@ -660,13 +665,22 @@ pub enum Take {
 /// `l3`: L3 is down on P1's pad. `player`: the index of the player whose B press the game is handling.
 /// `coins`: the coins the game offers P1's empty hand on Training's two-seat fighter select; `None` anywhere
 /// else (another select, a coin in the hand, a hidden or disabled hand).
-pub fn take(_l3: bool, _player: i32, _coins: Option<&Coins>) -> Take {
-    Take::Native
+pub fn take(l3: bool, player: i32, coins: Option<&Coins>) -> Take {
+    match coins {
+        Some(coins) if l3 && player == 0 => {
+            if coins.at[CPU_SLOT].is_some() { Take::Coin(CPU_SLOT) } else { Take::Nothing }
+        }
+        _ => Take::Native,
+    }
 }
 
 /// The coin slot and own-coin gate in w21 and w9.
-pub fn take_registers(_take: Take, pointed: u32, own: u32) -> (u32, u32) {
-    (pointed, own)
+pub fn take_registers(take: Take, pointed: u32, own: u32) -> (u32, u32) {
+    match take {
+        Take::Native => (pointed, own),
+        Take::Nothing => (u32::MAX, 0),
+        Take::Coin(slot) => (slot as u32, own),
+    }
 }
 
 pub struct CoinFacts {
@@ -894,8 +908,8 @@ pub const EV_BLOCKED: u8 = 4;
 pub const EV_TOKEN: u8 = 5;
 pub const EV_TAKE: u8 = 6;
 
-pub fn pack_take(screen: Screen, _slot: usize) -> (u64, u64) {
-    (screen.code(), 0)
+pub fn pack_take(screen: Screen, slot: usize) -> (u64, u64) {
+    (screen.code() | pack_index(Some(slot)) << 48, 0)
 }
 
 const NONE16: u64 = 0xffff;
@@ -1036,6 +1050,7 @@ pub fn describe(event: &RawEvent, out: &mut impl fmt::Write) -> fmt::Result {
             }
             write!(out, " x={x:.1} y={y:.1}")
         }
+        EV_TAKE => write!(out, "take screen={screen}{}", Token(a >> 48 & 0xffff)),
         EV_BLOCKED => {
             let counts = unpack_blocked(a);
             let directions = counts.iter().filter(|&&count| count != 0).count();
