@@ -1,0 +1,363 @@
+use super::*;
+use crate::layout::Layout;
+use crate::model::{
+    coin_offer, describe, empty_hand, pack_token, tile_at, token_target, CoinFacts, Coins, Line,
+    PadFrame, PadInput, RawEvent, Rect, BUTTON_L3, BUTTON_RIGHT, EV_TOKEN,
+};
+
+const SENTINEL: u64 = 0xc1ff_ff00_0000_0000;
+const RANDOM: u64 = 0xc100_000f_d5f7_fa78;
+
+fn wire(sample: Sample) -> String {
+    let mut bytes = Vec::new();
+    Publisher::default().poll(1, Some(sample), |value| {
+        bytes.extend_from_slice(value);
+        true
+    });
+    String::from_utf8(bytes).unwrap()
+}
+
+fn lines(actual: &str, expected: &[&str]) {
+    for line in expected {
+        assert!(actual.lines().any(|got| got == *line), "missing {line}: {actual}");
+    }
+}
+
+fn sample() -> Sample {
+    Sample {
+        screen: Some(Screen::Css),
+        grid: Some(Layout::Css),
+        local_seat: Some(0),
+        tick: 1,
+        observation: 1,
+        generation: 1,
+        p1_token: P1Token::Placed,
+        p1_placed: Some((67, Fighter(67))),
+        hand_token: HandToken::Slot(1),
+        p1_coin: P1Token::Placed,
+        p1_coin_at: Some(67),
+        cpu_token: P1Token::Placed,
+        cpu_placed: Some((86, Fighter(86))),
+        resting: true,
+        ..Sample::default()
+    }
+}
+
+fn measured_facts() -> CoinFacts {
+    CoinFacts {
+        flags: [1, 1, 1, 1, 1, 0, 0, 0],
+        rest: [(576.0, -77.0), (576.0, -77.0)],
+        pane: Some((576.0, -77.0)),
+    }
+}
+
+fn area() -> Rect {
+    Rect { xmin: -960.0, xmax: 960.0, ymin: -152.0, ymax: 458.0 }
+}
+
+fn bounds() -> Rect {
+    Rect { xmin: -935.0, xmax: 929.0, ymin: -490.0, ymax: 520.0 }
+}
+
+fn css_rectangles() -> Vec<Rect> {
+    let bytes = include_bytes!("layouts/css.bin");
+    bytes[16..].as_chunks::<32>().0.iter().map(|row| {
+        let f = |at| f32::from_le_bytes(row[at..at + 4].try_into().unwrap());
+        Rect { xmin: f(16), xmax: f(20), ymin: f(24), ymax: f(28) }
+    }).collect()
+}
+
+#[test]
+fn an_empty_hand_reports_the_token_it_points_at() {
+    for (token, expected) in [
+        (HandToken::None, "hand.token=none"),
+        (HandToken::Slot(0), "hand.token=0"),
+        (HandToken::Slot(1), "hand.token=1"),
+    ] {
+        lines(&wire(Sample { hand_token: token, ..sample() }), &[expected]);
+    }
+    for changed in [
+        Sample { resting: false, ..sample() },
+        Sample { p1_carried: Some(0), ..sample() },
+        Sample { local_seat: Some(1), ..sample() },
+        Sample { screen: Some(Screen::Sss), ..sample() },
+        Sample { screen: None, ..sample() },
+    ] {
+        lines(&wire(changed), &["hand.token=unknown", "token.settled=0"]);
+    }
+    let mut publisher = Publisher::default();
+    publisher.poll(1, Some(sample()), |_| true);
+    let mut stale = Vec::new();
+    publisher.poll(MAX_AGE + 2, None, |bytes| { stale.extend_from_slice(bytes); true });
+    lines(core::str::from_utf8(&stale).unwrap(), &["hand.token=unknown", "token.settled=0"]);
+}
+
+#[test]
+fn the_new_lines_follow_the_old_lines_in_wire_order() {
+    let value = wire(sample());
+    let keys: Vec<_> = value.lines().map(|line| line.split_once('=').unwrap().0).collect();
+    assert_eq!(&keys[43..], &[
+        "hand.token", "p1.coin", "p1.coin.at", "cpu.token", "cpu.placed.at",
+        "cpu.placed.kind", "cpu.placed.name", "cpu.placed.form", "carried.kind",
+        "carried.name", "carried.form", "target.token", "token.settled",
+    ]);
+}
+
+#[test]
+fn the_cpu_medal_reports_its_tile_and_fighter() {
+    let random = fighter_identity(86, RANDOM, [RANDOM, SENTINEL], [0, 0], true);
+    assert_eq!(random, Some(Fighter(86)));
+    let mut facts = MedalFacts {
+        carried: -1, holding: 0, visible: 1, grabbed: 0, panel_flags: [0, 1],
+        placed: Some(86), rect_matches: true, placed_fighter: random,
+    };
+    assert_eq!(facts.coin(1), P1Token::Placed);
+    lines(&wire(sample()), &[
+        "cpu.token=placed", "cpu.placed.at=86", "cpu.placed.kind=unknown",
+        "cpu.placed.name=\"Random\"", "cpu.placed.form=default",
+    ]);
+    let richter = CSS_TILES[67].word;
+    facts.placed = Some(67);
+    facts.placed_fighter = fighter_identity(67, richter, [richter, SENTINEL], [1, 0], true);
+    assert_eq!(facts.coin(1), P1Token::Placed);
+    let pyra = CSS_TILES[80].word;
+    facts.placed_fighter = fighter_identity(80, pyra, [pyra, 0xc100_7414_c6fc_852a], [0, 1], true);
+    assert_eq!(facts.coin(1), P1Token::Unknown);
+    facts.placed_fighter = random;
+    facts.placed = Some(86);
+    facts.panel_flags = [1, 1];
+    assert_eq!(facts.coin(1), P1Token::Unknown);
+}
+
+#[test]
+fn coins_are_offered_by_the_games_own_test() {
+    let valid = measured_facts();
+    assert_eq!(coin_offer(1, &valid, area()), Some((576.0, -77.0)));
+    let mut eight_medals = Coins { pointed: None, at: [None; crate::model::css::SLOTS] };
+    assert_eq!(eight_medals.at.len(), 8);
+    eight_medals.at[1] = coin_offer(1, &valid, area());
+    assert_eq!(eight_medals.at[1], Some((576.0, -77.0)));
+    for flag in [0, 1, 3, 4] {
+        let mut changed = measured_facts();
+        changed.flags[flag] = 0;
+        assert_eq!(coin_offer(1, &changed, area()), None, "flag +{:#x}", 0x118 + flag);
+    }
+    for flag in [5, 7] {
+        let mut changed = measured_facts();
+        changed.flags[flag] = 1;
+        assert_eq!(coin_offer(1, &changed, area()), None, "flag +{:#x}", 0x118 + flag);
+    }
+    let mut own = measured_facts();
+    own.flags[5] = 1;
+    assert_eq!(coin_offer(0, &own, area()), Some((576.0, -77.0)));
+    assert_eq!(coin_offer(2, &valid, area()), None);
+    let mut moving = measured_facts();
+    moving.rest[1].0 += 0.001;
+    assert_eq!(coin_offer(1, &moving, area()), None);
+    let mut pane = measured_facts();
+    pane.pane = Some((576.0, -76.999));
+    assert_eq!(coin_offer(1, &pane, area()), None);
+    pane.pane = None;
+    assert_eq!(coin_offer(1, &pane, area()), None);
+    assert_eq!(coin_offer(1, &valid, Rect { xmax: 575.0, ..area() }), None);
+}
+
+#[test]
+fn a_token_step_targets_the_coin_from_the_banner() {
+    let tiles = css_rectangles();
+    let point = (0.0001, 180.0);
+    let mut coins = Coins { pointed: None, at: [None; crate::model::css::SLOTS] };
+    coins.at[1] = coin_offer(1, &measured_facts(), area());
+    let slot = token_target(&coins, Dir::Left).unwrap();
+    let target = bounds().clamp(coins.at[slot].unwrap());
+    let from = tile_at(tiles.as_slice(), point);
+    let to = tile_at(tiles.as_slice(), target);
+    assert_eq!((from, to, slot, target), (Some(45), Some(86), 1, (576.0, -77.0)));
+    let (a, b) = pack_token(Screen::Css, Dir::Left, from, to, Some(slot), target);
+    let mut event = Line::<128>::new();
+    describe(&RawEvent { tick: 0, code: EV_TOKEN, a, b }, &mut event).unwrap();
+    assert_eq!(
+        core::str::from_utf8(event.as_bytes()).unwrap(),
+        "0 token screen=css dir=left from=45 to=86 coin=p2 x=576.0 y=-77.0"
+    );
+    let mut step = Step::default();
+    step.token_emitted(a);
+    assert_eq!((step.ack, step.applied, step.to, step.token_target), (1, 1, Some(86), Some(1)));
+}
+
+#[test]
+fn a_carried_cpu_coin_reports_its_hover_and_leaves_p1_placed() {
+    let carried = Sample {
+        p1_carried: Some(1), p1_token: P1Token::Unknown,
+        p1_placed: None, cpu_token: P1Token::Held, cpu_placed: None,
+        carried_fighter: Some(Fighter(67)), at: Some(67), hover: Some(67),
+        hand_token: HandToken::Unknown, ..sample()
+    };
+    lines(&wire(carried), &[
+        "p1.token=unknown", "p1.carried=1", "p1.coin=placed", "p1.coin.at=67",
+        "cpu.token=held", "carried.kind=68", "carried.name=\"Richter\"",
+        "carried.form=default", "hand.token=unknown",
+    ]);
+    let held = MedalFacts {
+        carried: 1, holding: 1, visible: 1, grabbed: 1, panel_flags: [0, 1],
+        placed: Some(67), rect_matches: true, placed_fighter: Some(Fighter(67)),
+    };
+    assert_eq!(held.coin(1), P1Token::Held);
+    assert_eq!(held.coin(0), P1Token::Placed);
+}
+
+#[test]
+fn an_empty_hand_token_step_targets_the_cpu_coin() {
+    let mut coins = Coins { pointed: None, at: [None; crate::model::css::SLOTS] };
+    coins.at[0] = Some((-100.0, 0.0));
+    coins.at[1] = Some((576.0, -77.0));
+    assert_eq!(token_target(&coins, Dir::Left), Some(1));
+    coins.pointed = Some(0);
+    assert_eq!(token_target(&coins, Dir::Right), Some(1));
+    coins.pointed = Some(1);
+    assert_eq!(token_target(&coins, Dir::Right), None);
+    assert_eq!(token_target(&coins, Dir::Up), None);
+    assert_eq!(token_target(&coins, Dir::Down), None);
+    for dir in [Dir::Up, Dir::Down] {
+        let frame = empty_hand(PadFrame { step: Some(dir), blocked: [0; 4] });
+        assert_eq!(frame.step, None);
+        assert_eq!(frame.blocked[dir as usize], 1);
+    }
+    let owner = (Screen::Css, 0x1000, 0x2000);
+    let source = (0, 1);
+    let chord = BUTTON_L3 | BUTTON_RIGHT;
+    let mut input = PadInput::new();
+    input.frame(owner, true, Some((source, &[(100, BUTTON_L3)])), || 0);
+    let frame = input.frame(owner, true, Some((source, &[
+        (104, chord), (103, BUTTON_L3), (102, chord), (101, BUTTON_L3), (100, BUTTON_L3)
+    ])), || 0);
+    let frame = empty_hand(frame);
+    assert_eq!(frame.step, Some(Dir::Right));
+    assert_eq!(frame.blocked[Dir::Right as usize], 1);
+    let mut standalone = PadInput::new();
+    let no_coins = standalone.frame(owner, false, None, || chord);
+    assert_eq!(no_coins.step, None);
+    assert_eq!(no_coins.blocked[Dir::Right as usize], 1);
+}
+
+#[test]
+fn the_longest_block_fits_its_buffer() {
+    let index = CSS_TILES.iter().enumerate().max_by_key(|(_, tile)| tile.name.len()).unwrap().0 as u16;
+    let longest = Sample {
+        at: Some(index), target: Some(index), hover: Some(index), fighter: Some(Fighter(index)),
+        p1_placed: Some((index, Fighter(index))), p1_coin_at: Some(index),
+        cpu_placed: Some((index, Fighter(index))), carried_fighter: Some(Fighter(index)),
+        observation: u64::MAX, generation: u64::MAX,
+        step: Step {
+            ack: u64::MAX, blocked: u64::MAX, applied: u64::MAX, last_written: u64::MAX,
+            dir: Some(Dir::Right), from: Some(index), to: Some(index),
+            token: Some(0), settled_ack: Some(u64::MAX),
+            token_step: true, token_target: Some(1),
+        },
+        ..sample()
+    };
+    let value = wire(longest);
+    assert!(!value.is_empty(), "publisher refused longest sample");
+    assert!(value.len() <= 2048, "length {}", value.len());
+    assert_eq!(value.lines().count(), 56);
+}
+
+// Generated by the printing test in a disposable 236c98d checkout; see
+// artifacts/phase23/setup-calls/tile/golden-manifest.json for provenance.
+fn legacy_sample(which: &str) -> Sample {
+    let placed = Sample {
+        observation: 5286, tick: 1, generation: 28, screen: Some(Screen::Css),
+        grid: Some(Layout::Css), local_seat: Some(0), at: Some(45), target: Some(45),
+        p1_token: P1Token::Placed, p1_placed: Some((67, Fighter(67))), resting: false,
+        step: Step { ack: 54, applied: 54, ..Step::default() },
+        ..Sample::default()
+    };
+    match which {
+        "p1" => placed,
+        "empty" => Sample { observation: 5292, resting: true, ..placed },
+        "cpu" => Sample {
+            observation: 5300, at: Some(85), target: Some(85), hover: Some(85),
+            p1_carried: Some(1), p1_token: P1Token::Unknown, p1_placed: None,
+            hand_steppable: true, resting: true,
+            step: Step {
+                ack: 55, applied: 55, dir: Some(Dir::Left), from: Some(86), to: Some(85),
+                token: Some(1), last_written: 55, settled_ack: Some(55), ..Step::default()
+            },
+            ..placed
+        },
+        _ => panic!("unknown legacy fixture"),
+    }
+}
+
+fn legacy(sample: Sample) -> String {
+    let mut publisher = Publisher::default();
+    publisher.revision = 856;
+    let mut bytes = Vec::new();
+    publisher.poll(1, Some(sample), |value| { bytes.extend_from_slice(value); true });
+    String::from_utf8(bytes).unwrap().lines().take(43).collect::<Vec<_>>().join("\n")
+}
+
+#[test]
+fn old_lines_are_unchanged_for_p1s_coin() {
+    assert_eq!(legacy(legacy_sample("p1")), include_str!("golden-p1-236c98d.txt"));
+}
+
+#[test]
+fn old_lines_are_unchanged_for_an_empty_hand() {
+    assert_eq!(legacy(legacy_sample("empty")), include_str!("golden-empty-236c98d.txt"));
+}
+
+#[test]
+fn old_lines_are_unchanged_for_a_carried_cpu_coin() {
+    assert_eq!(legacy(legacy_sample("cpu")), include_str!("golden-cpu-236c98d.txt"));
+}
+
+#[test]
+fn a_six_frame_hold_steps_once() {
+    let owner = (Screen::Css, 0x1000, 0x2000);
+    for empty in [false, true] {
+        let mut input = PadInput::new();
+        let mut count = 0;
+        for pressed in [true, true, true, true, true, true, false] {
+            let frame = input.frame(owner, true, None, || {
+                if pressed { BUTTON_L3 | BUTTON_RIGHT } else { 0 }
+            });
+            let frame = if empty { empty_hand(frame) } else { frame };
+            count += usize::from(frame.step == Some(Dir::Right));
+            assert_eq!(frame.blocked, [0; 4]);
+        }
+        assert_eq!(count, 1, "empty={empty}");
+    }
+}
+
+#[test]
+fn a_token_step_shows_in_the_old_lines_only_as_a_step() {
+    let mut value = sample();
+    value.hand_token = HandToken::Slot(1);
+    let (a, _) = pack_token(Screen::Css, Dir::Left, Some(45), Some(86), Some(1), (576.0, -77.0));
+    value.step.token_emitted(a);
+    let actual = wire(value);
+    lines(&actual, &[
+        "ack=1", "applied=1", "ack.result=handled", "result=handled", "direction=left",
+        "from=45", "to=86", "settled=0", "settled.ack=unknown",
+        "target.token=1", "token.settled=1",
+    ]);
+    value.hand_token = HandToken::Slot(0);
+    lines(&wire(value), &["token.settled=0"]);
+    let (no_tile, _) = pack_token(Screen::Css, Dir::Left, Some(45), None, Some(1), (1.0, 1.0));
+    let mut no_tile_step = Step::default();
+    no_tile_step.token_emitted(no_tile);
+    lines(&wire(Sample { step: no_tile_step, ..value }), &["ack.result=handled", "target.token=1"]);
+}
+
+#[test]
+fn an_edge_token_step_is_an_edge() {
+    let (a, _) = pack_token(Screen::Css, Dir::Right, Some(86), None, None, (576.0, -77.0));
+    let mut step = Step::default();
+    step.token_emitted(a);
+    let value = wire(Sample { step, ..sample() });
+    lines(&value, &[
+        "ack=1", "applied=0", "ack.result=edge", "result=edge", "to=none",
+        "target.token=none", "token.settled=0",
+    ]);
+}

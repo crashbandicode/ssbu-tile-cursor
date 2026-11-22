@@ -672,3 +672,7 @@ impl Publisher {
 #[cfg(test)]
 #[path = "provider_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "provider_cpu_tests.rs"]
+mod cpu_tests;
