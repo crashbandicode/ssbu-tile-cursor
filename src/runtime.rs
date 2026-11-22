@@ -404,7 +404,7 @@ unsafe fn on_screen(screen: Screen, object: u64, view: &View) {
     let now = tick();
     if state.screen != Some((screen, object)) {
         state.screen = Some((screen, object));
-        state.input.gap();
+        state.input.reset();
         state.settle_cursor = 0;
         push_event(
             EV_SCREEN,

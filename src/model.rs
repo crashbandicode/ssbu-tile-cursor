@@ -449,6 +449,12 @@ enum Prev {
     Blocked,
 }
 
+/// The sample ring only ever adds samples that arrived between two consecutive
+/// steppable callbacks of the same hand (screen, picker object, cursor) on
+/// the same pad source. In every other situation the step decision is exactly
+/// the pre-ring one: one `Repeater` update with the newest sample when the hand
+/// may step, a released repeater when it may not, and a full reset only when
+/// the screen or picker object changes.
 pub struct PadInput {
     owner: Option<PadOwner>,
     source: Option<PadSource>,
@@ -477,6 +483,11 @@ impl PadInput {
     }
 
     pub fn gap(&mut self) {
+        self.tracker.reset();
+        self.prev = Prev::Gap;
+    }
+
+    pub fn reset(&mut self) {
         *self = Self::new();
     }
 
@@ -488,16 +499,15 @@ impl PadInput {
         newest: impl FnOnce() -> u64,
     ) -> PadOutcome {
         let ring = ring.filter(|(_, samples)| !samples.is_empty());
-        if self.owner != Some(owner) {
+        if self.owner.map(|(screen, object, _)| (screen, object)) != Some((owner.0, owner.1)) {
+            self.reset();
+        } else if self.owner != Some(owner) {
             self.gap();
-            self.owner = Some(owner);
         }
+        self.owner = Some(owner);
         let history = ring.is_some_and(|(source, _)| {
             self.source == Some(source) && self.tracker.last.is_some() && self.prev != Prev::Gap
         });
-        if ring.is_some_and(|(source, _)| self.source != Some(source)) {
-            self.steps = Repeater::new();
-        }
         let mut batch = [(0, 0); PAD_RING];
         let count = if let Some((source, samples)) = ring {
             self.source = Some(source);
@@ -519,9 +529,6 @@ impl PadInput {
         }
         if steppable {
             self.blocked = Repeater::new();
-            if self.prev != Prev::Steppable {
-                self.steps = Repeater::new();
-            }
             let (dir, used) = self.steps.feed(&buttons[..count]);
             if ring.is_some() {
                 self.tracker.consume(&batch[..count], used);
@@ -1099,17 +1106,17 @@ mod tests {
             let buttons = choices[draw(&mut seed) as usize % choices.len()];
             ring.insert(0, (i64::from(callback) + 100, buttons));
             ring.truncate(PAD_RING);
-            if draw(&mut seed) % 13 == 0 {
+            if draw(&mut seed).is_multiple_of(13) {
                 coverage[0] += 1;
                 input.gap();
                 continue;
             }
-            if draw(&mut seed) % 9 == 0 {
+            if draw(&mut seed).is_multiple_of(9) {
                 coverage[1] += 1;
                 owner.2 ^= 1;
             }
-            if owner_changes && draw(&mut seed) % 43 == 0 {
-                if draw(&mut seed) % 2 == 0 {
+            if owner_changes && draw(&mut seed).is_multiple_of(43) {
+                if draw(&mut seed).is_multiple_of(2) {
                     owner.0 = if owner.0 == Screen::Css { Screen::Sss } else { Screen::Css };
                     coverage[5] += 1;
                 } else {
@@ -1118,15 +1125,15 @@ mod tests {
                 }
                 reference = Repeater::new();
             }
-            if draw(&mut seed) % 11 == 0 {
+            if draw(&mut seed).is_multiple_of(11) {
                 coverage[2] += 1;
                 source.0 ^= 1;
             }
-            let steppable = draw(&mut seed) % 4 != 0;
+            let steppable = !draw(&mut seed).is_multiple_of(4);
             if !steppable {
                 coverage[3] += 1;
             }
-            let ring_available = draw(&mut seed) % 4 != 0;
+            let ring_available = !draw(&mut seed).is_multiple_of(4);
             if !ring_available {
                 coverage[4] += 1;
             }
