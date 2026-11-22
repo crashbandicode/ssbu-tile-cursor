@@ -106,10 +106,6 @@ pub(super) unsafe fn coins(css: u64, view: &View) -> Option<Coins> {
         return None;
     }
     let area = rect_at(hand_addr + hand::AREA as u64);
-    let current = read_point(view.cursor + cursor::CURRENT as u64);
-    if !area.contains(current.0, current.1) {
-        return None;
-    }
     let mut result = Coins {
         pointed: usize::try_from(pointed).ok(),
         at: [None; model::css::SLOTS],

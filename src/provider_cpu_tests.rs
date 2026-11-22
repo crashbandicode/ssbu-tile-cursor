@@ -192,6 +192,16 @@ fn a_token_step_targets_the_coin_from_the_banner() {
 }
 
 #[test]
+fn a_token_step_can_start_outside_the_hand_area() {
+    let current = (0.0, -300.0);
+    assert!(!area().contains(current.0, current.1));
+    let mut coins = Coins { pointed: None, at: [None; crate::model::css::SLOTS] };
+    coins.at[1] = coin_offer(1, &measured_facts(), area());
+    assert_eq!(token_target(&coins, Dir::Right), Some(1));
+    assert_eq!(coins.at[1], Some((576.0, -77.0)));
+}
+
+#[test]
 fn a_carried_cpu_coin_reports_its_hover_and_leaves_p1_placed() {
     let carried = Sample {
         p1_carried: Some(1), p1_token: P1Token::Unknown,
