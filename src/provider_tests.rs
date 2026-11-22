@@ -1259,3 +1259,84 @@ fn blocked_counter_is_appended_and_survives_owner_changes() {
     assert_eq!(changed.step.blocked, 2);
     assert_eq!(changed.step.ack, original.step.ack);
 }
+
+#[test]
+fn an_up_at_the_top_row_edge_always_logs_to_none() {
+    use crate::model::{describe, neighbour, tile_at, Line, PadInput, PadOutcome, RawEvent, Rect,
+                       BUTTON_L3, BUTTON_UP, EV_STEP};
+
+    let css = include_bytes!("layouts/css.bin");
+    assert_eq!(css.len(), 16 + 87 * 32);
+    let word = |bytes: &[u8]| u64::from_le_bytes(bytes.try_into().unwrap());
+    let rect = |bytes: &[u8]| {
+        let f = |offset| f32::from_le_bytes(bytes[offset..offset + 4].try_into().unwrap());
+        Rect { xmin: f(0), xmax: f(4), ymin: f(8), ymax: f(12) }
+    };
+    let bounds = rect(&css[..16]);
+    let rows = css[16..].as_chunks::<32>().0;
+    assert_eq!(Layout::identify(Screen::Css, rows.len(), [word(&css[..8]), word(&css[8..16])], |i| {
+        let row = &rows[i];
+        ([word(&row[..8]), word(&row[8..16])], [word(&row[16..24]), word(&row[24..32])])
+    }), Some(Layout::Css));
+    let tiles: Vec<_> = rows.iter().map(|row| rect(&row[16..])).collect();
+    let point = tiles[2].centre();
+    assert_eq!(point, (-576.0, 415.0));
+    assert_eq!(tile_at(tiles.as_slice(), point), Some(2));
+    let event = |dir| {
+        let step = neighbour(tiles.as_slice(), point, dir, &bounds);
+        assert_eq!((step.from, step.to, step.target), (Some(2), None, point));
+        let (a, b) = pack_step(Screen::Css, dir, &step, Some(0));
+        let mut line = Line::<128>::new();
+        describe(&RawEvent { tick: 0, code: EV_STEP, a, b }, &mut line).unwrap();
+        let line = core::str::from_utf8(line.as_bytes()).unwrap().strip_prefix("0 ").unwrap().to_owned();
+        (a, line)
+    };
+    let expected = "step screen=css dir=up from=2 to=none token=p1 x=-576.0 y=415.0";
+    let owner = (Screen::Css, 0x1000, 0x2000);
+    let source = (0, 1);
+    let chord = BUTTON_L3 | BUTTON_UP;
+
+    let mut live = PadInput::new();
+    let live_dir = match live.frame(owner, true, Some((source, &[(200, chord)])), || 0) {
+        PadOutcome::Step(dir) => dir,
+        other => panic!("expected live-chord step, got {other:?}"),
+    };
+    assert_eq!(event(live_dir).1, expected);
+
+    let mut input = PadInput::new();
+    let a = [(100, BUTTON_L3), (99, 0)];
+    let b = [(104, 0), (103, chord), (102, chord), (101, BUTTON_L3), (100, BUTTON_L3)];
+    let outcomes = [
+        input.frame(owner, true, Some((source, &a)), || 0),
+        input.frame(owner, true, Some((source, &b)), || 0),
+        input.frame(owner, true, Some((source, &b)), || 0),
+    ];
+    assert_eq!(outcomes, [PadOutcome::None, PadOutcome::Step(Dir::Up), PadOutcome::None]);
+    let events: Vec<_> = outcomes.into_iter().filter_map(|outcome| match outcome {
+        PadOutcome::Step(dir) => Some(event(dir)),
+        _ => None,
+    }).collect();
+    assert_eq!(events.len(), 1, "expected one top-edge step log");
+    assert_eq!(events[0].1, expected);
+
+    let mut sample = css_reliability_sample(11);
+    sample.at = Some(2);
+    sample.hover = Some(2);
+    sample.target = Some(2);
+    sample.resting = true;
+    sample.fighter = Some(Fighter(2));
+    let before = block(&mut Publisher::default(), 1, Some(sample), true);
+    sample.step.emitted(events[0].0);
+    let after = block(&mut Publisher::default(), 1, Some(sample), true);
+    assert_lines(&after, &[
+        "ack=12", "applied=11", "ack.result=edge", "direction=up", "from=2",
+        "to=none", "result=edge", "at=2", "settled=1", "phase=settled",
+        "target.at=2", "blocked=0",
+    ]);
+    for key in ["kind", "name", "form", "p1.placed.kind", "p1.placed.name", "p1.placed.form",
+                "placed.kind", "placed.name", "placed.form", "target.kind", "target.name"] {
+        let prefix = format!("{key}=");
+        assert_eq!(before.lines().find(|line| line.starts_with(&prefix)),
+                   after.lines().find(|line| line.starts_with(&prefix)), "{key}");
+    }
+}
