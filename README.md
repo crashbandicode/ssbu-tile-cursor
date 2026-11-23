@@ -64,6 +64,8 @@ drawn on the clips from the run's own input log.
 
 ## Install
 
+Tested on: Super Smash Bros. Ultimate 13.0.5 · Switch firmware 23.5.0 · Atmosphère 1.12.2
+
 Copy the approved `libssbu_tile_cursor.nro` to
 `sd:/atmosphere/contents/01006A800016E000/romfs/skyline/plugins/`. The plugin
 checks 13.0.5 and the native movement sites before installing movement. Its
