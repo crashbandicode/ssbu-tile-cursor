@@ -49,7 +49,10 @@ drawn on the clips from the run's own input log.
   Not read: the fighter select's internal state. Not checked at runtime: sub-screens opened with an empty hand (the CPU level slider, the name list, the rules).
 - On Training's two-seat fighter select, L3 + B takes an offered CPU coin into
   P1's empty hand. With a coin already held the combination does nothing. L3
-  must be down before B; the game still sees B, including a held B.
+  must be down when B goes down for the take. While L3 is held there, and
+  until that B is released, the game's Back hold does not see B: L3 + B never
+  leaves the fighter select, however long it is held. B without L3 is the
+  game's.
 - State block: `observation.active=0` means the newest sample is older than
   0.3 s or the screen has no P1 view; a sample is never inactive merely because
   it was stamped after the publisher read the clock. A placed or hovered fighter
@@ -66,7 +69,7 @@ Copy the approved `libssbu_tile_cursor.nro` to
 checks 13.0.5 and the native movement sites before installing movement. Its
 optional bridge observations have additional guards. Each step is logged to
 `sd:/ultimate/ssbu-tile-cursor/events.log` after the tick.
-When the take hook is installed the install line includes `take=1`.
+When the take and Back-hold hooks are installed (both or neither) the install line includes `take=1`.
 
 ```text
 <tick> step screen=css dir=left from=85 to=84 token=p2 x=288.0 y=-77.0

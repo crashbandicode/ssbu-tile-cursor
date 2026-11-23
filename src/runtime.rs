@@ -12,7 +12,7 @@
 //! allocations (expected 0) in the log.
 use crate::model::{
     self, cursor, describe, hand, input, neighbour, pack_blocked, pack_screen, pack_settled,
-    pack_step, pack_take, pack_token, tile_at, Coins, Line, PadInput, RawEvent, Rect, Screen, Site, Take, TakePress, Tiles,
+    pack_step, pack_take, pack_token, tile_at, ChordB, Coins, Line, PadInput, RawEvent, Rect, Screen, Site, Take, TakePress, Tiles,
     BUTTON_L3, EV_BLOCKED, EV_SCREEN, EV_SETTLED, EV_STEP, EV_TAKE, EV_TOKEN, PAD_RING, TICKS_PER_SECOND,
 };
 use core::cell::UnsafeCell;
@@ -102,6 +102,7 @@ static PAD_GC: AtomicU64 = AtomicU64::new(0);
 struct GameState {
     input: PadInput,
     take: TakePress,
+    chord: ChordB,
     screen: Option<(Screen, u64)>,
     /// The cursor whose step is waiting to settle, settled frames seen, and
     /// the token slot the hand carried for that step (CSS).
@@ -115,6 +116,7 @@ unsafe impl Sync for Shared {}
 static STATE: Shared = Shared(UnsafeCell::new(GameState {
     input: PadInput::new(),
     take: TakePress::new(),
+    chord: ChordB::new(),
     screen: None,
     settle_cursor: 0,
     settle_frames: 0,
@@ -410,6 +412,7 @@ unsafe fn on_screen(screen: Screen, object: u64, view: &View, coins: Option<&Coi
         state.screen = Some((screen, object));
         state.input.reset();
         state.take = TakePress::new();
+        state.chord = ChordB::new();
         state.settle_cursor = 0;
         push_event(
             EV_SCREEN,
@@ -597,6 +600,24 @@ unsafe fn tile_cursor_take(ctx: &mut InlineCtx) {
     }
 }
 
+/// In the fighter select's update, at `ldrb w8, [x28, #0xf86]`: bit 0 of w20 is the game's "Back held" answer
+/// for this update, from every player's B. While P1's L3 + B chord lasts on Training's two-seat fighter
+/// select that bit is cleared, so the chord's B neither starts nor continues the Back hold. Registers only.
+#[skyline::hook(offset = model::CSS_BACK_HELD_OFFSET, inline)]
+unsafe fn tile_cursor_chord(ctx: &mut InlineCtx) {
+    let state = &mut *STATE.0.get();
+    let buttons = p1_buttons();
+    if buttons & BUTTON_L3 == 0 && !state.chord.hidden() {
+        return;
+    }
+    let css = ctx.registers[28].x();
+    let scope = valid(css) && css_view(css).is_some_and(|view| observed::chord_scope(css, &view));
+    let held = ctx.registers[20].w();
+    if state.chord.update(scope, buttons, held & 1 != 0) {
+        ctx.registers[20].set_x(u64::from(held & !1));
+    }
+}
+
 fn install_cursor_hooks(observe: bool, take: bool) {
     if observe {
         observed::prepare_stage();
@@ -606,7 +627,7 @@ fn install_cursor_hooks(observe: bool, take: bool) {
         skyline::install_hooks!(tile_cursor_css, tile_cursor_sss, tile_cursor_query);
     }
     if take {
-        skyline::install_hooks!(tile_cursor_take);
+        skyline::install_hooks!(tile_cursor_take, tile_cursor_chord);
     }
 }
 

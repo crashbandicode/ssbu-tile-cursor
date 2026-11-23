@@ -211,6 +211,10 @@ pub(super) unsafe fn take_coins(css: u64, view: &View) -> Option<Coins> {
     offered(grid(Screen::Css, view), css, view)
 }
 
+pub(super) unsafe fn chord_scope(css: u64, view: &View) -> bool {
+    grid(Screen::Css, view) == Some(crate::layout::Layout::Css) && p1::hand(css, view).is_some()
+}
+
 pub(super) unsafe fn observe(screen: Screen, object: u64, view: Option<View>) {
     stage_reader::close_update();
     let owner = &mut *OWNER.0.get();

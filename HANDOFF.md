@@ -128,5 +128,6 @@ L3 + B takes the offered CPU coin into P1's empty hand on the captured two-seat
 fighter select; the game's B remains unchanged outside the scope. The new
 bridge counters are `take.ack` and `take.applied`. Console pad-id recognition,
 the CPU-held analogy and the fighter select's internal state are not measured;
-the game still sees held B. Evidence and the requirement trace are under
+the game's Back hold does not see the B of an L3 + B chord (`.text+0x1a2d760`), so a full hand makes L3 + B a no-op also with
+Instant Back loaded; that pairing is not run. Evidence and the requirement trace are under
 `artifacts/phase23/tile-take/`; independent review and Eden proof remain open.

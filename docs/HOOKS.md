@@ -3,8 +3,8 @@
 All offsets are relative to `.text`. The plugin checks 64 guard bytes at each
 site listed in `src/model.rs` (`SITES`), and it installs the three movement
 hooks together or none. Their guarded sites include seven places whose data
-layout they depend on. The take hook has its own guard set and can install
-independently of the bridge. The game version must also read `13.0.5`.
+layout they depend on. The take and Back-hold hooks share one guard set,
+install together or not at all, and do not need the bridge. The game version must also read `13.0.5`.
 
 ## Hooks (all inline, game main thread)
 
@@ -14,6 +14,7 @@ independently of the bridge. The game version must also read `13.0.5`.
 | `0x1b29cbc` | `mov x19, x0` after the prologue of the stage-select update `0x1b29cb0` (vtable `0x50aa728` slot 0) | x0 = stage-select object | The same, with the stage tiles, whenever the hand is enabled. |
 | `0x3786244` | `mov x0, x20` before `bl 0x3763840` (the stick/D-pad query) in the hand cursor update `0x3786140` | x19 = cursor, x20 = input context | Only for P1's hand cursor, only while a screen hook has just seen that hand able to step, and only while L3 is held: points x20 at a static copy of the context. The copy's input object has its four D-pad words cleared. The stick passes through unchanged. When the query returns zero, the rest of the update does not read x20. |
 | `0x1a14664` | `cmn w21, #1` in the fighter-picking update | x19 = CSS, x8 = player, w21 = pointed slot, w9 = own-coin gate | On P1's L3 + B with an empty hand in the captured two-seat select, give the game's pickup the offered CPU slot; when it is not offered, set w21 to -1 and w9 to 0. Otherwise both registers are unchanged. |
+| `0x1a2d760` | `ldrb w8, [x28, #0xf86]` after the Back-hold loop of the CSS update | x28 = CSS, w20 bit 0 = "Back held" from every player's B | While P1's L3 + B chord lasts on the captured two-seat select (L3 down, or the press that began under it still held), clears that bit. Otherwise unchanged. |
 
 The two screen hooks sit after the prologue rather than at the function entry.
 This leaves the entry free for other plugins that replace it.
@@ -49,7 +50,7 @@ hand only while it held P1's own token.
 | `0x1a13148` | The same update. It skips the hover when the carried slot is -1. Otherwise it compares the hit tile with the hover record of that slot. |
 
 The optional observed owner checks six additional 64-byte witnesses from the
-owned 13.0.5 ELF. The take hook also checks three witnesses for its B path.
+owned 13.0.5 ELF. The take hook also checks three witnesses for its B path, and the Back-hold hook one.
 None of these witnesses is a hook.
 
 | Site | First instruction | What it confirms |
@@ -63,6 +64,8 @@ None of these witnesses is a hook.
 | `0x1a14654` | `cbz w10, 0x1a15818` | Empty-hand gate, B word at `+0x1ac` and the player's pointed slot. |
 | `0x1a14a00` | `cbz w9, 0x1a15818` | Own-coin gate and branch into the pickup. |
 | `0x1a145c4` | `ldrsw x9, [x8, #0x28]` | Player index and the own-medal visibility gate. |
+| `0x1a2d730` | `ldr x10, [x10, #0x8]` | Back-hold loop tail, the join and its compare; hooked at `+0x30`. |
+| `0x1a2d6b0` | `ldp x9, x10, [x29, #-0xb8]` | `mov w20, wzr`, the players vector and the empty-vector branch to the join. |
 
 ## Data
 
@@ -161,7 +164,13 @@ consume input.
 - L3 is bit 4.
 - D-pad left, up, right and down are bits 12, 13, 14 and 15.
 
-The game itself still sees every button. P1's hand cursor's D-pad query returns
+The game itself still sees every button, with one exception: on the captured two-seat
+fighter select its Back hold does not see B while L3 is held, nor until that B is released.
+P1's hand cursor's D-pad query returns
 nothing while L3 is held and the hand can step. On the captured two-seat
 fighter select, L3 + B redirects the empty hand's pickup to the offered CPU
 coin, or to no coin when it is not offered.
+
+Instant Back 0.3.1 guards `0x1a2d6f0..0x1a2d730`, `0x1a2d770..0x1a2d7b0`
+and `0x1a2d930..0x1a2d970`. The Back-hold guard is the 64 bytes between the first two, so neither plugin's
+patch lies inside the other's guard.

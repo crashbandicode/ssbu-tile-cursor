@@ -22,6 +22,7 @@ pub mod cpu_guards;
 
 pub const SUPPORTED_VERSION: &str = "13.0.5";
 pub const CSS_TAKE_OFFSET: usize = 0x1a14664;
+pub const CSS_BACK_HELD_OFFSET: usize = 0x1a2d760;
 pub use cpu_guards::TAKE_SITES;
 
 /// A 13.0.5 `.text` offset and the 64 bytes that must be there.
@@ -311,6 +312,9 @@ impl TakePress {
     }
 }
 
+/// P1's L3 + B chord on Training's two-seat fighter select, as the game's Back hold sees it: not at all.
+/// While L3 is down the Back hold is hidden. Once hidden it stays hidden until B is up on the pad and the
+/// game no longer reports the hold, so letting go of L3 first does not hand the rest of the press to the game.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct ChordB {
     hidden: bool,
@@ -325,8 +329,12 @@ impl ChordB {
         self.hidden
     }
 
-    pub fn update(&mut self, _scope: bool, _buttons: u64, _held: bool) -> bool {
-        false
+    /// `scope`: Training's two-seat fighter select with P1's hand shown and enabled. `buttons`: P1's pad now.
+    /// `held`: the game's own "Back held" answer for this update. True when that answer must read "not held".
+    pub fn update(&mut self, scope: bool, buttons: u64, held: bool) -> bool {
+        let hide = scope && (buttons & BUTTON_L3 != 0 || self.hidden);
+        self.hidden = hide && (buttons & BUTTON_B != 0 || held);
+        hide
     }
 }
 
@@ -1183,6 +1191,38 @@ mod tests {
         assert_eq!(load_store_offset(word(&CSS_TAKE_GATE, 3)), css::MEDALS);
         assert_eq!(word(&CSS_TAKE_GATE, 4), 0x5280_260c);
         assert_eq!(load_store_offset(word(&CSS_TAKE_GATE, 6)), 0x11b);
+    }
+
+    #[test]
+    fn the_back_hold_sites_hold_the_instructions_the_chord_hook_relies_on() {
+        use cpu_guards::{CSS_BACK_HELD, CSS_BACK_LOOP};
+        assert_eq!(CSS_BACK_HELD_OFFSET, CSS_BACK_HELD.offset + 0x30);
+        assert_eq!(word(&CSS_BACK_HELD, 12), 0x397e_1b88);
+        assert_eq!(load_store_offset(word(&CSS_BACK_HELD, 12)), 0xf86);
+        assert_eq!(word(&CSS_BACK_HELD, 13), 0x1200_0289);
+        assert_eq!(word(&CSS_BACK_HELD, 8), 0x2a1f_0294);
+        assert_eq!(word(&CSS_BACK_LOOP, 11), 0x2a1f_03f4);
+        assert_eq!(load_store_offset(word(&CSS_BACK_LOOP, 12)), css::PLAYERS);
+    }
+
+    #[test]
+    fn the_back_hold_hook_stays_clear_of_instant_back() {
+        let windows = [0x1a2d6f0, 0x1a2d770, 0x1a2d930];
+        let patches = [0x1a2d714, 0x1a2d788, 0x1a2d798, 0x1a2d954];
+        for start in windows {
+            assert!(!(start..start + 64).contains(&CSS_BACK_HELD_OFFSET));
+        }
+        let optional = [
+            &cpu_guards::CSS_MEDAL_COUNT, &cpu_guards::CSS_HOVER_HAND_AREA,
+            &cpu_guards::CSS_HOVER_MEDAL_FLAGS, &cpu_guards::CSS_HOVER_MEDAL_POSITION,
+            &cpu_guards::CSS_HOVER_TOKEN_WRITE, &cpu_guards::CSS_GRAB_HOVER_TOKEN,
+        ];
+        for site in SITES.iter().copied().chain(TAKE_SITES).chain(optional) {
+            for patch in patches {
+                assert!(!(site.offset..site.offset + site.guard.len()).contains(&patch),
+                        "{} overlaps {patch:#x}", site.name);
+            }
+        }
     }
 
     #[test]

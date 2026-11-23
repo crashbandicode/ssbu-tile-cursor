@@ -14,7 +14,7 @@ fn chooses_owner_once_at_install_after_weak_registration() {
         .expect("startup hook installer");
     assert!(hooks.contains("tile_cursor_css, tile_cursor_sss, tile_cursor_query"));
     assert!(hooks.contains("observed_css, observed_sss, tile_cursor_query"));
-    assert!(hooks.contains("if take {") && hooks.contains("skyline::install_hooks!(tile_cursor_take)"));
+    assert!(hooks.contains("if take {") && hooks.contains("skyline::install_hooks!(tile_cursor_take, tile_cursor_chord)"));
     assert!(main.contains("observed::take_mismatch()"));
 }
 

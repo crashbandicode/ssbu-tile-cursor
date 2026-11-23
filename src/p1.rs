@@ -73,7 +73,7 @@ unsafe fn rect_at(addr: u64) -> Rect {
     }
 }
 
-pub(super) unsafe fn coins(css: u64, view: &View) -> Option<Coins> {
+pub(super) unsafe fn hand(css: u64, view: &View) -> Option<(u64, u64)> {
     let vector = css + model::css::PLAYERS as u64;
     let begin = read_u64(vector);
     if !valid(begin) || read_u64(vector + 8).checked_sub(begin) != Some(32)
@@ -88,7 +88,15 @@ pub(super) unsafe fn coins(css: u64, view: &View) -> Option<Coins> {
         || read_u8(player + model::css::PLAYER_ACTIVE as u64) != 1
         || read_u8(hand_addr + hand::ENABLED as u64) == 0
         || read_u8(hand_addr + hand::SHOWN as u64) == 0
-        || read_i32(player + model::css::PLAYER_CARRIED as u64) != -1
+    {
+        return None;
+    }
+    Some((player, hand_addr))
+}
+
+pub(super) unsafe fn coins(css: u64, view: &View) -> Option<Coins> {
+    let (player, hand_addr) = hand(css, view)?;
+    if read_i32(player + model::css::PLAYER_CARRIED as u64) != -1
         || read_u8(hand_addr + hand::HOLDING as u64) != 0
     {
         return None;
