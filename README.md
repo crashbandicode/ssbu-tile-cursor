@@ -27,6 +27,26 @@ All three clips: Eden, 2026-11-13, the v0.1.0 release NRO (`b8313ca2…`, build
 `15d3f31`). The game shows no input on these screens, so the input labels are
 drawn on the clips from the run's own input log.
 
+## Take the CPU's coin: L3 + B
+
+On Training's fighter select, hold L3 and press B with an empty hand: the CPU's
+coin comes to your hand. L3 + D-pad then moves it one fighter per press, and A
+puts it down.
+
+| Buttons | When | What happens |
+| --- | --- | --- |
+| L3 + B | your hand is empty | The CPU's coin comes to your hand |
+| L3 + D-pad | a coin is in your hand | The coin moves one fighter in that direction |
+| A | a coin is in your hand | The coin is placed on the fighter under it |
+
+It works on Training's fighter select only; everywhere else L3 + B is the
+game's own B. With a coin already in your hand it does nothing, and it never
+backs out of the fighter select. More:
+[docs/TAKE-CPU-COIN.md](docs/TAKE-CPU-COIN.md).
+
+*Build `0353c5a`, 2026-11-23: host tests only. The clip is added, with its
+date, from the Eden run that passes this feature's rows.*
+
 ## Behaviour
 
 - At most one step per update. Holding the combination repeats every 15 game

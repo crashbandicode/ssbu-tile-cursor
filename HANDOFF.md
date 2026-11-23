@@ -128,6 +128,17 @@ L3 + B takes the offered CPU coin into P1's empty hand on the captured two-seat
 fighter select; the game's B remains unchanged outside the scope. The new
 bridge counters are `take.ack` and `take.applied`. Console pad-id recognition,
 the CPU-held analogy and the fighter select's internal state are not measured;
-the game's Back hold does not see the B of an L3 + B chord (`.text+0x1a2d760`), so a full hand makes L3 + B a no-op also with
-Instant Back loaded; that pairing is not run. Evidence and the requirement trace are under
-`artifacts/phase23/tile-take/`; independent review and Eden proof remain open.
+the game's Back hold does not see the B of an L3 + B chord (`.text+0x1a2d760`),
+so a full hand makes L3 + B a no-op also with Instant Back loaded; that pairing
+is not run. Evidence and the requirement trace are under
+`artifacts/phase23/tile-take/`.
+
+- Code review of `e68d8ad` passed on 2026-11-22 (23:48:50Z in the inbox). The Back-hold change (`0353c5a`) is
+  with the reviewer. No Eden proof yet: the rows `artifacts/phase23/tile-take/rows-tile-take.json` (tk00 to
+  tk06 and tk04b) are handed to the combined run.
+- Decided by the primary on 2026-11-23: the scope stays Training's fighter select; with an empty hand and no
+  offered CPU coin the combination does nothing and never takes P1's own coin back; with a full hand L3 + B
+  does nothing, so the game's Back hold does not see its B.
+- User page: `docs/TAKE-CPU-COIN.md` and the README section "Take the CPU's coin: L3 + B", on the local branch
+  `review/cpu-coin-docs` (docs only, on top of `0353c5a`; the NRO is that commit's). The clip and the Eden date
+  are added there once the rows have passed.
