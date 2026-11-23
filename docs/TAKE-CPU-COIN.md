@@ -3,9 +3,9 @@
 On Training's fighter select, L3 + B puts the CPU's coin in your hand, so you can give the CPU another fighter
 without first moving the hand onto its coin.
 
-<video src="media/take-cpu-coin.mp4" autoplay muted loop playsinline controls></video>
+[![The CPU's coin in P1's hand on Training's fighter select, with the label L3 + B](media/take-cpu-coin-poster.png)](media/take-cpu-coin.mp4)
 
-*L3 + B takes the CPU's coin from Samus, L3 + Right four times carries it to Fox, and A places it. Eden,
+*Click the picture to play the clip: L3 + B takes the CPU's coin from Samus, L3 + Right four times carries it to Fox, and A places it. Eden,
 2026-11-23, build `0353c5a`. The game shows no input on this screen, so the button labels are drawn on the clip
 from the run's input log.*
 
