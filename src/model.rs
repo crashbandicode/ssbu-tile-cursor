@@ -311,6 +311,25 @@ impl TakePress {
     }
 }
 
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct ChordB {
+    hidden: bool,
+}
+
+impl ChordB {
+    pub const fn new() -> Self {
+        Self { hidden: false }
+    }
+
+    pub fn hidden(&self) -> bool {
+        self.hidden
+    }
+
+    pub fn update(&mut self, _scope: bool, _buttons: u64, _held: bool) -> bool {
+        false
+    }
+}
+
 pub const TICKS_PER_SECOND: u64 = 19_200_000;
 /// The first step fires on the press; held, it repeats every 15 subsequent
 /// screen updates (250 ms at 60 fps), independent of host wall time.

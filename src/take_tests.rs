@@ -75,3 +75,72 @@ fn take_events_are_logged_with_the_coin() {
     let text = core::str::from_utf8(line.as_bytes()).unwrap().strip_prefix("0 ").unwrap();
     assert_eq!(text, "take screen=css token=p2");
 }
+
+#[test]
+fn l3_b_with_p1s_own_coin_in_the_hand_never_reaches_the_back_hold() {
+    let mut chord = ChordB::new();
+    assert!(chord.update(true, BUTTON_L3, false));
+    for i in 0..120 {
+        assert!(chord.update(true, BUTTON_L3 | BUTTON_B, i >= 11));
+    }
+    let mut instant = ChordB::new();
+    assert!(instant.update(true, BUTTON_L3, false));
+    assert!(instant.update(true, BUTTON_L3 | BUTTON_B, true));
+    assert!(chord.update(true, 0, false));
+    assert!(!chord.hidden());
+    assert!(!chord.update(true, 0, false));
+}
+
+#[test]
+fn the_chord_stays_hidden_when_l3_is_released_first() {
+    let mut chord = ChordB::new();
+    assert!(chord.update(true, BUTTON_L3 | BUTTON_B, false));
+    for _ in 0..80 {
+        assert!(chord.update(true, BUTTON_B, true));
+    }
+    assert!(chord.update(true, 0, true));
+    assert!(chord.update(true, 0, false));
+    assert!(!chord.hidden());
+    assert!(!chord.update(true, BUTTON_B, true));
+}
+
+#[test]
+fn a_plain_b_is_never_hidden() {
+    let mut chord = ChordB::new();
+    for held in [false, true] {
+        for _ in 0..100 {
+            assert!(!chord.update(true, BUTTON_B, held));
+        }
+    }
+    assert!(!chord.update(false, BUTTON_L3 | BUTTON_B, true));
+    assert!(!chord.hidden());
+}
+
+#[test]
+fn b_before_l3_is_hidden_from_the_moment_l3_goes_down() {
+    let mut chord = ChordB::new();
+    assert!(!chord.update(true, BUTTON_B, false));
+    assert!(!chord.update(true, BUTTON_B, true));
+    assert!(chord.update(true, BUTTON_L3 | BUTTON_B, true));
+    assert!(chord.update(true, BUTTON_B, true));
+    assert!(chord.update(true, 0, false));
+    assert!(!chord.update(true, 0, false));
+}
+
+#[test]
+fn a_tap_the_pad_no_longer_shows_is_hidden_while_the_game_reports_it() {
+    let mut chord = ChordB::new();
+    assert!(chord.update(true, BUTTON_L3, true));
+    assert!(chord.hidden());
+    assert!(chord.update(true, BUTTON_L3, false));
+    assert!(!chord.update(true, 0, false));
+}
+
+#[test]
+fn leaving_the_scope_ends_the_chord() {
+    let mut chord = ChordB::new();
+    assert!(chord.update(true, BUTTON_L3 | BUTTON_B, true));
+    assert!(!chord.update(false, BUTTON_L3 | BUTTON_B, true));
+    assert!(!chord.hidden());
+    assert!(!chord.update(true, BUTTON_B, true));
+}
