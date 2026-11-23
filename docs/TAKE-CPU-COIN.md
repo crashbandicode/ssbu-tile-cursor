@@ -9,6 +9,8 @@ without first moving the hand onto its coin.
 2026-11-23, build `0353c5a`. The game shows no input on this screen, so the button labels are drawn on the clip
 from the run's input log.*
 
+L3 + B does nothing while your hand already holds a coin (not shown in the clip).
+
 ## How to use it
 
 1. Open Training's fighter select and place your own coin on your fighter.
@@ -36,8 +38,7 @@ B, even if you let go of L3 first.
 ## Good to know
 
 - Hold L3 first, then press B. A B pressed before L3 is the game's own B.
-- B without L3 is unchanged: with an empty hand it takes your own coin back, and holding it backs out of the
-  fighter select.
+- B without L3 keeps the game's normal behaviour.
 
 ## Where it works
 
