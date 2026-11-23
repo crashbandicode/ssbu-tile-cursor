@@ -44,8 +44,10 @@ game's own B. With a coin already in your hand it does nothing, and it never
 backs out of the fighter select. More:
 [docs/TAKE-CPU-COIN.md](docs/TAKE-CPU-COIN.md).
 
-*Build `0353c5a`, 2026-11-23: host tests only. The clip is added, with its
-date, from the Eden run that passes this feature's rows.*
+<video src="docs/media/take-cpu-coin.mp4" autoplay muted loop playsinline controls></video>
+
+*L3 + B takes the CPU's coin from Samus, L3 + Right four times carries it to Fox, and A places it. Eden,
+2026-11-23, build `0353c5a`; input labels drawn from the run's input log.*
 
 ## Behaviour
 

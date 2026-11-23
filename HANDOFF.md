@@ -133,12 +133,11 @@ so a full hand makes L3 + B a no-op also with Instant Back loaded; that pairing
 is not run. Evidence and the requirement trace are under
 `artifacts/phase23/tile-take/`.
 
-- Code review of `e68d8ad` passed on 2026-11-22 (23:48:50Z in the inbox). The Back-hold change (`0353c5a`) is
-  with the reviewer. No Eden proof yet: the rows `artifacts/phase23/tile-take/rows-tile-take.json` (tk00 to
-  tk06 and tk04b) are handed to the combined run.
+- Code review passed for `e68d8ad` (2026-11-22) and for the Back-hold change `0353c5a` (2026-11-23). Eden,
+  2026-11-23, run `rc15-ib-17060a5e-yoga-main-2`: rows tk00 to tk06 and tk04b passed (`docs/EDEN-RESULTS.md`).
+  Not run: Instant Back loaded together with the Tile Cursor; a console.
 - Decided by the primary on 2026-11-23: the scope stays Training's fighter select; with an empty hand and no
   offered CPU coin the combination does nothing and never takes P1's own coin back; with a full hand L3 + B
   does nothing, so the game's Back hold does not see its B.
 - User page: `docs/TAKE-CPU-COIN.md` and the README section "Take the CPU's coin: L3 + B", on the local branch
-  `review/cpu-coin-docs` (docs only, on top of `0353c5a`; the NRO is that commit's). The clip and the Eden date
-  are added there once the rows have passed.
+  `review/cpu-coin-docs` (docs only, on top of `0353c5a`; the NRO is that commit's). The clip `docs/media/take-cpu-coin.mp4` is from that run.
