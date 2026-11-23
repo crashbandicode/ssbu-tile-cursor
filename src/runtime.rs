@@ -98,7 +98,7 @@ static PAD_HANDHELD: AtomicU64 = AtomicU64::new(0);
 static PAD_JOY_DUAL: AtomicU64 = AtomicU64::new(0);
 static PAD_GC: AtomicU64 = AtomicU64::new(0);
 
-/// State only the two screen hooks touch; both run on the game's main thread.
+/// State only the two screen hooks and the Back-hold hook touch; all three run on the game's main thread.
 struct GameState {
     input: PadInput,
     take: TakePress,
@@ -111,7 +111,7 @@ struct GameState {
     settle_token: Option<usize>,
 }
 struct Shared(UnsafeCell<GameState>);
-// SAFETY: accessed only from the screen hooks, which run on one thread.
+// SAFETY: accessed only from those three hooks, which run on one thread (the Back-hold hook sits in the CSS update).
 unsafe impl Sync for Shared {}
 static STATE: Shared = Shared(UnsafeCell::new(GameState {
     input: PadInput::new(),
