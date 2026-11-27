@@ -64,22 +64,87 @@ drawn on the clips from the run's own input log.
 
 ## Install
 
-Tested on: Super Smash Bros. Ultimate 13.0.5 · Switch firmware 23.5.0 · Atmosphère 1.12.2
+[v0.1.0+frame-repeat.1](https://git.syntaxbyexample.com/intpa/ssbu-tile-cursor/releases/tag/v0.1.0+frame-repeat.1) (2026-11-18) lets P1 hold L3 + D-pad to repeat tile steps every 15 screen updates.
 
-Copy the approved `libssbu_tile_cursor.nro` to
-`sd:/atmosphere/contents/01006A800016E000/romfs/skyline/plugins/`. The plugin
-checks 13.0.5 and the native movement sites before installing movement. Its
-optional bridge observations have additional guards. Each step is logged to
-`sd:/ultimate/ssbu-tile-cursor/events.log` after the tick.
-When the take and Back-hold hooks are installed (both or neither) the install line includes `take=1`.
+### What you need
 
-```text
-<tick> step screen=css dir=left from=85 to=84 token=p2 x=288.0 y=-77.0
-<tick> settled screen=css at=84 hovered=84 x=288.0 y=-77.0
-```
+| Thing | Upstream | Our fork | What the fork changes |
+|---|---|---|---|
+| Switch firmware | 23.5.0 | — | — |
+| Super Smash Bros. Ultimate | 13.0.5 | — | — |
+| Atmosphère | [1.12.2](https://github.com/Atmosphere-NX/Atmosphere/releases/latest) | [intpa/atmosphere-ro-cleanup-p1](https://git.syntaxbyexample.com/intpa/atmosphere-ro-cleanup-p1) | Frees resources after a module fails to load. |
+| Skyline | [latest](https://github.com/skyline-dev/skyline/releases/latest) | [intpa/skyline](https://git.syntaxbyexample.com/intpa/skyline) | Protects the log queue when threads write together. |
 
-The accepted frame-repeat release `66f00442…` is installed on the Switch card.
-The clips above use the earlier [v0.1.0 release](https://git.syntaxbyexample.com/intpa/ssbu-tile-cursor/releases/tag/v0.1.0).
+### What to copy
+
+1. Fully close Smash.
+2. Download [libssbu_tile_cursor.nro](https://git.syntaxbyexample.com/intpa/ssbu-tile-cursor/releases/download/v0.1.0+frame-repeat.1/libssbu_tile_cursor.nro) and copy it to `sd:/atmosphere/contents/01006A800016E000/romfs/skyline/plugins/libssbu_tile_cursor.nro`.
+3. Keep `manifest.json` and `SHA256SUMS.txt` on your computer. Relaunch Smash.
+
+**Update** — Close Smash and replace the existing `libssbu_tile_cursor.nro` at the same path. Keep other plugins.
+
+**Uninstall** — Close Smash, remove `libssbu_tile_cursor.nro` from that path and relaunch.
+
+### What changed
+
+| Change | Details |
+|---|---|
+| Holding L3 + D-pad repeats the first step every 15 screen updates. | [Guide](https://git.syntaxbyexample.com/intpa/ssbu-tile-cursor/src/tag/v0.1.0+frame-repeat.1/README.md) |
+
+### Tested on
+
+| Feature | Hardware | Eden |
+|---|---|---|
+| Held repeat every 15 screen updates | No recorded test on this build | No recorded test on this build |
+
+### Known limits
+
+On character select, P1 must hold a token. Press B to take P1’s token back. The cursor stops at grid edges. [Details](https://git.syntaxbyexample.com/intpa/ssbu-tile-cursor/src/tag/v0.1.0+frame-repeat.1/README.md)
+
+<details>
+<summary>Earlier release · v0.1.0</summary>
+
+[v0.1.0](https://git.syntaxbyexample.com/intpa/ssbu-tile-cursor/releases/tag/v0.1.0) (2026-10-29) lets P1 press L3 + D-pad to move one tile on character and stage select.
+
+### What you need
+
+| Thing | Upstream | Our fork | What the fork changes |
+|---|---|---|---|
+| Switch firmware | [latest](https://en-americas-support.nintendo.com/app/answers/detail/a_id/22525) | — | — |
+| Super Smash Bros. Ultimate | 13.0.5 | — | — |
+| Atmosphère | [latest](https://github.com/Atmosphere-NX/Atmosphere/releases/latest) | [intpa/atmosphere-ro-cleanup-p1](https://git.syntaxbyexample.com/intpa/atmosphere-ro-cleanup-p1) | Frees resources after a module fails to load. |
+| Skyline | [latest](https://github.com/skyline-dev/skyline/releases/latest) | [intpa/skyline](https://git.syntaxbyexample.com/intpa/skyline) | Protects the log queue when threads write together. |
+
+### What to copy
+
+1. Fully close Smash.
+2. Download [ssbu-tile-cursor-v0.1.0-sd.zip](https://git.syntaxbyexample.com/intpa/ssbu-tile-cursor/releases/download/v0.1.0/ssbu-tile-cursor-v0.1.0-sd.zip) and unzip it on your computer. Copy its `atmosphere` folder to the SD root, merging folders. Keep `SSBU-TILE-CURSOR-README.txt` on your computer.
+3. Check that the plugin landed at `sd:/atmosphere/contents/01006A800016E000/romfs/skyline/plugins/libssbu_tile_cursor.nro`. The separate [libssbu_tile_cursor.nro](https://git.syntaxbyexample.com/intpa/ssbu-tile-cursor/releases/download/v0.1.0/libssbu_tile_cursor.nro) is the same plugin for manual installation at that path.
+4. Keep `manifest.json` and `SHA256SUMS.txt` on your computer. Relaunch Smash.
+
+**Update** — Close Smash and replace the existing `libssbu_tile_cursor.nro` at the same path. Keep other plugins.
+
+**Uninstall** — Close Smash, remove `libssbu_tile_cursor.nro` from that path and relaunch.
+
+### What changed
+
+| Change | Details |
+|---|---|
+| Press L3 + D-pad to step one stage tile. | [Guide](https://git.syntaxbyexample.com/intpa/ssbu-tile-cursor/src/tag/v0.1.0/README.md) |
+| Carry P1’s token or a CPU coin one fighter tile at a time. | [Guide](https://git.syntaxbyexample.com/intpa/ssbu-tile-cursor/src/tag/v0.1.0/README.md) |
+
+### Tested on
+
+| Feature | Hardware | Eden |
+|---|---|---|
+| One-tile stage steps | No | Yes |
+| Character steps carrying P1’s token or a CPU coin | No | Yes |
+
+### Known limits
+
+On character select, P1 must hold a token. Press B to take P1’s token back. The cursor stops at grid edges. [Details](https://git.syntaxbyexample.com/intpa/ssbu-tile-cursor/src/tag/v0.1.0/README.md)
+
+</details>
 
 ## Optional bridge state
 
