@@ -8,17 +8,17 @@ Skyline plugin for Super Smash Bros. Ultimate 13.0.5: on the character and
 stage select screens, **L3 + D-pad** moves P1's hand exactly one tile. Built
 for automation, where stick input overshoots.
 
-![Stage select: four L3 + Right steps move the hand from the Training tile to Final Destination, then L3 + Down moves it one row to Jungle Japes](docs/media/stage-select.gif)
+<video src="https://git.syntaxbyexample.com/intpa/ssbu-tile-cursor/media/blob/339627c2c86d9da7cc54695359591c47357ef470" aria-label="Stage select: four L3 + Right steps move the hand from the Training tile to Final Destination, then L3 + Down moves it one row to Jungle Japes" autoplay muted loop playsinline controls></video> [Open the clip](docs/media/stage-select.mp4)
 
 *Training's stage select: four L3 + Right steps from the Training tile land on
 Final Destination; L3 + Down then moves one row, to Jungle Japes.*
 
-![Character select: P1's hand carries its token from Mii Swordfighter up to Hero and right to Terry, and A places it](docs/media/character-select-p1.gif)
+<video src="https://git.syntaxbyexample.com/intpa/ssbu-tile-cursor/media/blob/2298bc26e4909a902ac6815d4417c9302b0e5b5e" aria-label="Character select: P1&#x27;s hand carries its token from Mii Swordfighter up to Hero and right to Terry, and A places it" autoplay muted loop playsinline controls></video> [Open the clip](docs/media/character-select-p1.mp4)
 
 *P1 carries its token from Mii Swordfighter: L3 + Up to Hero, L3 + Right twice
 to Terry, then A places it.*
 
-![Character select: P1's empty hand picks up the CPU's coin on Random, steps it left three tiles and up one to Joker, and drops it](docs/media/character-select-cpu.gif)
+<video src="https://git.syntaxbyexample.com/intpa/ssbu-tile-cursor/media/blob/10d7f5860466751f71faaca107a883b175a88b2d" aria-label="Character select: P1&#x27;s empty hand picks up the CPU&#x27;s coin on Random, steps it left three tiles and up one to Joker, and drops it" autoplay muted loop playsinline controls></video> [Open the clip](docs/media/character-select-cpu.mp4)
 
 *With P1's token placed, its empty hand picks up the CPU's coin on Random (A),
 carries it to Joker (L3 + Left three times, L3 + Up) and drops it (A).*
